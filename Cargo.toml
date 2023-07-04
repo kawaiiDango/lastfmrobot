@@ -1,0 +1,34 @@
+[package]
+name = "lastfmrobot"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+teloxide = { version = "0.12", features = ["macros", "throttle"] }
+log = "0.4"
+pretty_env_logger = "0.5"
+tokio = { version =  "1.28", features = ["full"] }
+reqwest = "0.11.18"
+serde_json = "1.0.99"
+rusqlite = { version = "0.29.0", features = ["bundled"] }
+image = "0.24.6"
+imageproc = "0.23.0"
+rusttype = "0.9.3"
+url-escape = "0.1.1"
+http-cache-reqwest = { version = "0.10.0", features = ["manager-moka"] }
+reqwest-middleware = "0.2.2"
+num-format = "0.4.4"
+bytes = "1.4.0"
+serde = "1.0.164"
+serde_with = "3.0.0"
+timeago = "0.4.1"
+rand = "0.8.5"
+once_cell = "1.18.0"
+async-trait = "0.1.68"
+task-local-extensions = "0.1.4"
+anyhow = "1.0.71"
+moka = "0.11.2"
+strum = "0.25.0"
+strum_macros = "0.25.0"

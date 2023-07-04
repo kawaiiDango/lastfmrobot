@@ -1,0 +1,7 @@
+/target
+/src/config.rs
+/http-cacache
+/.vscode
+*.sqlite
+*.db
+*.jpg
