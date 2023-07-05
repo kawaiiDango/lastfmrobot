@@ -214,7 +214,6 @@ pub fn parse_collage_arg(arg: &str) -> (u32, TimePeriod, EntryType, bool) {
     }
 
     for split in splits {
-        
         if !entry_type_found {
             entry_type_found = true;
             if split.starts_with("artist") {

@@ -3,15 +3,19 @@ use bytes::Bytes;
 use image::codecs::jpeg::JpegEncoder;
 use image::{ImageBuffer, Rgba, RgbaImage};
 use imageproc::drawing::draw_text_mut;
+use once_cell::sync::Lazy;
 use rusttype::{Font, Scale};
 
 use crate::api_requester::{Album, CLIENT_NOCACHE};
 
-const FONT_PATH: &str = "NotoSansCJKtc-Medium.ttf";
 const FONT_SIZE: f32 = 24.0;
 const TILE_PX: u32 = 300;
 pub const MAX_SIZE: u32 = 7;
 pub const MIN_SIZE: u32 = 1;
+static FONT: Lazy<Font> = Lazy::new(|| {
+    let font_data = std::fs::read("NotoSansCJKtc-Medium.ttf").ok().unwrap();
+    Font::try_from_vec(font_data).unwrap()
+});
 
 async fn fetch_album_arts(albums: &[&Album]) -> Vec<Result<Bytes, anyhow::Error>> {
     let mut handles = Vec::new();
@@ -50,8 +54,6 @@ pub async fn create_collage(
     let collage_size: u32 = TILE_PX * size;
 
     let mut collage = ImageBuffer::from_pixel(collage_size, collage_size, Rgba([0, 0, 0, 255]));
-    let font_data = std::fs::read(FONT_PATH).ok().unwrap();
-    let font = Font::try_from_vec(font_data).unwrap();
 
     let albums = albums
         .iter()
@@ -96,7 +98,7 @@ pub async fn create_collage(
                     x,
                     y,
                     Scale::uniform(FONT_SIZE),
-                    &font,
+                    &FONT,
                     text,
                 )
             };

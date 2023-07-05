@@ -1,6 +1,14 @@
 #![feature(lazy_cell)]
+#![feature(iter_collect_into)]
 
-use std::{cmp::min, collections::HashSet, error::Error, sync::Mutex};
+use std::{
+    cmp::min,
+    collections::HashSet,
+    error::Error,
+    fs::File,
+    io::{BufRead, BufReader},
+    sync::Mutex,
+};
 
 use api_requester::{ApiType, TimePeriod};
 use db::{Db, User};
@@ -42,10 +50,10 @@ type Bot = Throttle<teloxide::Bot>;
 enum Command {
     #[command(description = "Vrooooooom!")]
     Start,
-    #[command(description = "Your recently played sowngs")]
+    #[command(description = "Your last played song")]
     Status,
     Np,
-    #[command(description = "Your last 3 recently played songs and album art")]
+    #[command(description = "Your last 3 songs and album art")]
     #[allow(non_camel_case_types)]
     Status_Full,
     NpFull,
@@ -59,7 +67,7 @@ enum Command {
     Collage {
         arg: String,
     },
-    #[command(description = "Shuffle your scrobbles")]
+    #[command(description = "A random top artist/album/track")]
     Random {
         arg: String,
     },
@@ -83,7 +91,13 @@ enum Command {
 }
 
 static DB: Lazy<Mutex<Db>> = Lazy::new(|| Mutex::new(Db::new()));
-pub static ME: OnceCell<Me> = OnceCell::new();
+static ME: OnceCell<Me> = OnceCell::new();
+static ACCEPTABLE_TAGS: Lazy<HashSet<String>> = Lazy::new(|| {
+    BufReader::new(File::open("everynoise_genres.txt").unwrap())
+        .lines()
+        .map(|x| x.unwrap())
+        .collect()
+});
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -138,7 +152,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 async fn track(event_type: &str, user: Option<&teloxide::types::User>) {
-    anal::add_event(event_type, user).await.unwrap_or_default();
+    anal::add_event(
+        event_type,
+        user,
+        ME.get().unwrap().username.clone().unwrap(),
+    )
+    .await
+    .unwrap_or_default();
 }
 
 async fn message_handler(bot: Bot, msg: Message) -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -424,12 +444,13 @@ async fn status_command(
                         .tags
                         .unwrap_or_default()
                         .iter()
+                        .map(|t| t.to_lowercase())
+                        .filter(|t| t.split(' ').any(|x| ACCEPTABLE_TAGS.contains(x)))
                         .map(|t| {
                             t.replace(
                                 &['(', ')', ',', '\"', '.', ';', ':', '\'', '-', ' ', '/'][..],
                                 "_",
                             )
-                            .to_lowercase()
                         })
                         .filter(|x| !x.is_empty())
                         .map(|x| format!("#{x}"))
@@ -478,14 +499,8 @@ async fn status_command(
                 .collect::<Vec<String>>()
                 .join("\n");
 
-            let loved_text = if tracks[0].user_loved {
-                ", 💗 loved"
-            } else {
-                ""
-            };
-
             let text = format!(
-                "{}{} {} listening to\n{}{}{}",
+                "{}{} {} listening to\n{}{}",
                 album_art,
                 utils::name_with_link(&from, &user),
                 if tracks[0].now_playing {
@@ -495,7 +510,6 @@ async fn status_command(
                 },
                 tracks_text,
                 first_track_info,
-                loved_text,
             );
             let spotify_url_str = format!("{} — {}", tracks[0].artist, tracks[0].name);
             let fragment = url_escape::encode_fragment(&spotify_url_str);

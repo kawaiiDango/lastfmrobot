@@ -94,7 +94,7 @@ struct ForceCacheMiddleware {}
 impl Middleware for ForceCacheMiddleware {
     async fn handle(
         &self,
-        req: Request,
+        mut req: Request,
         extensions: &mut Extensions,
         next: Next<'_>,
     ) -> reqwest_middleware::Result<Response> {
@@ -105,17 +105,21 @@ impl Middleware for ForceCacheMiddleware {
             .unwrap_or_default()
             .contains("no-cache");
 
+        if !no_cache {
+            req.headers_mut().append(
+                "cache-control",
+                HeaderValue::from_str("max-stale=300").unwrap(),
+            );
+        }
+
         let mut resp = next.run(req, extensions).await?;
 
-        resp.headers_mut().insert(
-            "cache-control",
-            HeaderValue::from_str(if !no_cache {
-                "max-age=300, public, immutable"
-            } else {
-                "no-store"
-            })
-            .unwrap(),
-        );
+        if !no_cache {
+            resp.headers_mut().insert(
+                "cache-control",
+                HeaderValue::from_str("max-age=300, public, immutable").unwrap(),
+            );
+        }
         Ok(resp)
     }
 }
@@ -157,7 +161,7 @@ pub static CLIENT: Lazy<ClientWithMiddleware> = Lazy::new(|| {
     .with(Response200Middleware {})
     .with(ForceCacheMiddleware {})
     .with(Cache(HttpCache {
-        mode: CacheMode::ForceCache,
+        mode: CacheMode::Default,
         manager: MokaManager::new(
             moka::future::Cache::builder()
                 .max_capacity(100)
@@ -243,7 +247,8 @@ pub async fn fetch_lastfm_track(
     let name = track_json["name"].as_str().unwrap_or_default().to_string();
     let album_obj = track_json.get("album");
     let album = if let Some(album_obj) = album_obj {
-        album_obj["title"].as_str().map(|x| x.to_string())
+        let x = album_obj["title"].as_str().unwrap_or_default();
+        (!x.is_empty()).then_some(x.to_string())
     } else {
         None
     };
@@ -266,12 +271,21 @@ pub async fn fetch_lastfm_track(
         .unwrap_or_default()
         .parse::<u64>()
         .unwrap_or_default();
-    let user_playcount = track_json["userplaycount"]
-        .as_str()
-        .unwrap_or_default()
-        .parse::<u64>()
+    let user_playcount_obj = track_json.get("userplaycount");
+    let user_playcount = if let Some(user_playcount_obj) = user_playcount_obj {
+        user_playcount_obj
+            .as_str()
+            .unwrap_or_default()
+            .parse::<u64>()
+            .unwrap_or_default()
+    } else {
+        0
+    };
+
+    let user_loved = track_json
+        .get("userloved")
+        .map(|x| x.as_str().unwrap_or_default() == "1")
         .unwrap_or_default();
-    let user_loved = track_json["userloved"].as_str().unwrap_or_default() == "1";
     let tags = track_json["toptags"].get("tag").map(|x| {
         x.as_array()
             .into_iter()
@@ -337,7 +351,16 @@ pub async fn fetch_lastfm_album(
         .unwrap_or_default()
         .parse::<u64>()
         .unwrap_or_default();
-    let user_playcount = album_json["userplaycount"].as_u64().unwrap_or_default();
+    let user_playcount_obj = album_json.get("userplaycount");
+    let user_playcount = if let Some(user_playcount_obj) = user_playcount_obj {
+        user_playcount_obj
+            .as_str()
+            .unwrap_or_default()
+            .parse::<u64>()
+            .unwrap_or_default()
+    } else {
+        0
+    };
     let tags = album_json["tags"]
         .as_array()
         .into_iter()
@@ -390,11 +413,16 @@ pub async fn fetch_lastfm_artist(
         .unwrap_or_default()
         .parse::<u64>()
         .unwrap_or_default();
-    let user_playcount = artist_json["stats"]["userplaycount"]
-        .as_str()
-        .unwrap_or_default()
-        .parse::<u64>()
-        .unwrap_or_default();
+    let user_playcount_obj = artist_json["stats"].get("userplaycount");
+    let user_playcount = if let Some(user_playcount_obj) = user_playcount_obj {
+        user_playcount_obj
+            .as_str()
+            .unwrap_or_default()
+            .parse::<u64>()
+            .unwrap_or_default()
+    } else {
+        0
+    };
     let tags = artist_json["tags"]
         .as_array()
         .into_iter()
@@ -484,11 +512,14 @@ pub fn parse_lastfm_tracks(json_arr: &Value) -> Result<Vec<Track>, Box<dyn Error
             };
 
             let album_obj = track_json["album"].as_object();
+
             let album = if let Some(album_obj) = album_obj {
-                album_obj["#text"].as_str().map(|x| x.to_string())
+                let x = album_obj["#text"].as_str().unwrap_or_default();
+                (!x.is_empty()).then_some(x.to_string())
             } else {
                 None
             };
+
             let name = track_json["name"].as_str().unwrap_or_default().to_string();
             let album_art_url = get_biggest_lastfm_image(track_json);
             let date = track_json["date"]["uts"]
@@ -496,7 +527,7 @@ pub fn parse_lastfm_tracks(json_arr: &Value) -> Result<Vec<Track>, Box<dyn Error
                 .unwrap_or_default()
                 .parse::<u64>()
                 .ok();
-            let user_loved = track_json["loved"].as_bool().unwrap_or(false);
+            let user_loved = track_json["loved"].as_str().unwrap_or_default() == "1";
             let now_playing = track_json["@attr"]
                 .get("nowplaying")
                 .map(|x| x.as_str().unwrap_or_default())
@@ -532,9 +563,9 @@ pub async fn fetch_recent_tracks(
 ) -> Result<Vec<Track>, Box<dyn Error + Send + Sync>> {
     let base_url = get_base_url(api_type);
     let cache_control = if prefer_cached {
-        "max-age=300"
+        "max-stale=300"
     } else {
-        "no-cache"
+        "no-cache, must-revalidate"
     };
 
     match api_type {
@@ -574,6 +605,7 @@ pub async fn fetch_recent_tracks(
                 &[
                     ("method", "user.getrecenttracks"),
                     ("user", username),
+                    ("extended", "1"),
                     ("limit", "3"),
                     ("api_key", config::LASTFM_API_KEY),
                     ("format", "json"),

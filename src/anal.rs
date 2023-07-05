@@ -9,7 +9,7 @@ use once_cell::sync::Lazy;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
-use crate::{api_requester::CLIENT_NOCACHE, config, ME};
+use crate::{api_requester::CLIENT_NOCACHE, config};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct UploadBody {
@@ -39,6 +39,7 @@ static EVENTS_BUFFER: Lazy<Mutex<Vec<Event>>> = Lazy::new(|| Mutex::new(Vec::new
 pub async fn add_event(
     event_type: &str,
     user: Option<&teloxide::types::User>,
+    bot_username: String,
 ) -> Result<(), reqwest_middleware::Error> {
     let user_id = user
         .cloned()
@@ -49,7 +50,7 @@ pub async fn add_event(
     EVENTS_BUFFER.lock().unwrap().push(Event {
         event_type: event_type.to_string().into(),
         user_id: user_id.into(),
-        platform: ME.get().unwrap().username.clone(),
+        platform: bot_username.into(),
         time: Some(
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
