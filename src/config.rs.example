@@ -1,4 +1,5 @@
 pub const BOT_TOKEN: &str = "";
 pub const LASTFM_API_KEY: &str = "";
 pub const OWNER_ID: &str = "";
+pub const INLINE_IMAGES_DUMP_CHAT_ID: &str = "";
 pub const AMPLITUDE_KEY: &str = "";

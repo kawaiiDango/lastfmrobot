@@ -54,6 +54,7 @@ pub struct ScrobbleUser {
     pub album_count: u64,
     pub track_count: u64,
     pub profile_pic_url: Option<String>,
+    pub registered_date: Option<u64>,
 }
 
 #[derive(Debug, PartialEq, EnumString, Display, IntoStaticStr)]
@@ -619,6 +620,15 @@ pub async fn fetch_recent_tracks(
                 .await?;
 
             let json = response.json::<serde_json::Value>().await?;
+            let err = json["error"]
+                .as_object()
+                .map(|x| x["#text"].as_str().unwrap_or_default());
+            if let Some(err) = err {
+                if !err.is_empty() {
+                    return Err(Box::from(err));
+                }
+            }
+
             let tracks = parse_lastfm_tracks(&json["recenttracks"]["track"])?;
 
             Ok(tracks)
@@ -1009,6 +1019,7 @@ pub async fn fetch_user_info(
                 track_count,
                 album_count,
                 profile_pic_url: None,
+                registered_date: None,
             };
             Ok(user)
         }
@@ -1045,6 +1056,11 @@ pub async fn fetch_user_info(
                 .unwrap_or_default()
                 .parse::<u64>()
                 .unwrap_or_default();
+            let registered_date = if let Some(registered) = user_json["registered"].get("#text") {
+                registered.as_u64()
+            } else {
+                None
+            };
             let profile_pic_url = get_biggest_lastfm_image(user_json);
             let user = ScrobbleUser {
                 username: username.to_owned(),
@@ -1053,6 +1069,7 @@ pub async fn fetch_user_info(
                 track_count,
                 album_count,
                 profile_pic_url,
+                registered_date,
             };
             Ok(user)
         }

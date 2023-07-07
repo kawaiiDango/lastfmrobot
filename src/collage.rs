@@ -80,7 +80,7 @@ pub async fn create_collage(
                 image::imageops::overlay(&mut collage, &tile, tile_x.into(), tile_y.into());
             }
             Err(_) => {
-                continue;
+                // continue;
             }
         };
 
@@ -129,9 +129,6 @@ pub async fn create_collage(
             image::imageops::overlay(&mut collage, &text_image, tile_x.into(), tile_y.into());
         }
     }
-
-    // save collage to a file collage.jpg
-    // collage.save("collage.jpg").unwrap();
 
     let mut jpeg_bytes: Vec<u8> = Vec::new();
     let mut encoder = JpegEncoder::new(&mut jpeg_bytes);

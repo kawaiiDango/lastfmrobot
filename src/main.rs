@@ -101,7 +101,7 @@ static ACCEPTABLE_TAGS: Lazy<HashSet<String>> = Lazy::new(|| {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    pretty_env_logger::init();
+    pretty_env_logger::init_timed();
 
     let bot = teloxide::Bot::new(config::BOT_TOKEN).throttle(Limits {
         messages_per_sec_chat: 1,
@@ -347,8 +347,9 @@ async fn send_err_msg(
     log::error!("{e}");
     let text = if let Some(middleware_error) = e.downcast_ref::<reqwest_middleware::Error>() {
         middleware_error
-            .to_string()
-            .replace("Middleware error: ", "")
+            .source()
+            .map(|e| e.to_string())
+            .unwrap_or(consts::ERR_MSG.to_string())
     } else {
         consts::ERR_MSG.to_string()
     };
@@ -466,27 +467,35 @@ async fn status_command(
             };
 
             if !tags_text.is_empty() {
-                first_track_info = format!("{first_track_info}\n{tags_text}");
+                first_track_info = format!("{first_track_info}\n\n{tags_text}\n");
             }
 
             let tracks_text = tracks
                 .iter()
                 .take(limit)
                 .map(|track| {
-                    let time_ago = if track.date.is_none() {
-                        "".to_owned()
-                    } else {
+                    let time_ago = if track.date.is_some() {
                         ", ".to_owned() + &utils::convert_to_timeago(track.date.unwrap())
+                    } else {
+                        "".to_owned()
                     };
 
+                    let spotify_url_str = format!("{} — {}", tracks[0].artist, tracks[0].name);
+                    let fragment = url_escape::encode_fragment(&spotify_url_str);
+
+                    let spotify_url =
+                        Url::parse(&format!("https://open.spotify.com/search/{}", &fragment))
+                            .unwrap();
+
                     let s = format!(
-                        "🎧 <i>{}</i> — <b>{}</b>{}{}{}{}",
+                        "🎧 <i>{}</i> — <a href=\"{}\"><b>{}</b></a>{}{}{}{}",
                         utils::replace_html_symbols(&track.artist),
+                        spotify_url,
                         utils::replace_html_symbols(&track.name),
                         track
                             .album
                             .as_ref()
-                            .map(|x| format!(", [{x}]"))
+                            .map(|x| format!(", [{}]", utils::replace_html_symbols(x)))
                             .unwrap_or("".to_string()),
                         time_ago,
                         if track.user_loved { ", 💗 loved" } else { "" },
@@ -511,13 +520,8 @@ async fn status_command(
                 tracks_text,
                 first_track_info,
             );
-            let spotify_url_str = format!("{} — {}", tracks[0].artist, tracks[0].name);
-            let fragment = url_escape::encode_fragment(&spotify_url_str);
 
-            let spotify_url =
-                Url::parse(&format!("https://open.spotify.com/search/{}", &fragment)).unwrap();
-
-            let mut keyboard = vec![vec![InlineKeyboardButton::url("🔎", spotify_url)]];
+            let mut keyboard = vec![vec![]];
 
             match status_type {
                 StatusType::Expanded => {
@@ -539,6 +543,10 @@ async fn status_command(
                     ));
                 }
                 StatusType::CompactWithCover => {
+                    keyboard[0].push(InlineKeyboardButton::callback(
+                        "➖",
+                        format!("{} status {}", from.id.0, StatusType::Compact),
+                    ));
                     keyboard[0].push(InlineKeyboardButton::callback(
                         "➕",
                         format!("{} status {}", from.id.0, StatusType::Expanded),
@@ -689,12 +697,19 @@ async fn set_command(
 
         Err(e) => {
             log::error!("{e}");
-            format!(
-                "{}\n\n{} for {}\n\nChange your account type using the buttons.",
-                e.to_string().replace("Middleware error: ", ""),
-                consts::USER_NOT_FOUND,
-                api_type
-            )
+            if let Some(middleware_error) = e.downcast_ref::<reqwest_middleware::Error>() {
+                format!(
+                    "{}\n\n{} for {}\n\nChange your account type using the buttons.",
+                    middleware_error
+                        .source()
+                        .map(|e| e.to_string())
+                        .unwrap_or(consts::ERR_MSG.to_string()),
+                    consts::USER_NOT_FOUND,
+                    api_type
+                )
+            } else {
+                consts::ERR_MSG.to_string()
+            }
         }
     };
 
@@ -789,7 +804,7 @@ async fn top_command(
                             format!(
                                 "<a href=\"{}\">{}</a> -> {} plays",
                                 spotify_url,
-                                entry.name,
+                                utils::replace_html_symbols(&entry.name),
                                 entry.user_playcount.to_formatted_string(&Locale::en)
                             )
                         })
@@ -813,8 +828,8 @@ async fn top_command(
                             format!(
                                 "<a href=\"{}\">{} — {}</a> -> {} plays",
                                 spotify_url,
-                                entry.artist,
-                                entry.name,
+                                utils::replace_html_symbols(&entry.artist),
+                                utils::replace_html_symbols(&entry.name),
                                 entry.user_playcount.to_formatted_string(&Locale::en)
                             )
                         })
@@ -838,8 +853,8 @@ async fn top_command(
                             format!(
                                 "<a href=\"{}\">{} — {}</a> -> {} plays",
                                 spotify_url,
-                                entry.artist,
-                                entry.name,
+                                utils::replace_html_symbols(&entry.artist),
+                                utils::replace_html_symbols(&entry.name),
                                 entry.user_playcount.to_formatted_string(&Locale::en)
                             )
                         })
@@ -965,6 +980,7 @@ async fn collage_command(
                         inline_message_id.as_ref(),
                         edit,
                         Some(keyboard),
+                        true,
                     )
                     .await?;
                 }
@@ -1051,7 +1067,7 @@ async fn random_command(
                 search_text = x.name.clone().into();
                 format!(
                     "{}\n({} plays)",
-                    x.name,
+                    utils::replace_html_symbols(&x.name),
                     x.user_playcount.to_formatted_string(&Locale::en)
                 )
             });
@@ -1068,8 +1084,8 @@ async fn random_command(
                 search_text = (x.artist.clone() + " " + &x.name.clone()).into();
                 format!(
                     "{} — {}\n({} plays)",
-                    x.artist,
-                    x.name,
+                    utils::replace_html_symbols(&x.artist),
+                    utils::replace_html_symbols(&x.name),
                     x.user_playcount.to_formatted_string(&Locale::en)
                 )
             });
@@ -1086,8 +1102,8 @@ async fn random_command(
                 search_text = (x.artist.clone() + " " + &x.name.clone()).into();
                 format!(
                     "{} — {}\n({} plays)",
-                    x.artist,
-                    x.name,
+                    utils::replace_html_symbols(&x.artist),
+                    utils::replace_html_symbols(&x.name),
                     x.user_playcount.to_formatted_string(&Locale::en)
                 )
             });
@@ -1154,19 +1170,35 @@ async fn flex_command(
             .to_owned(),
     );
 
+    let scrobbling_since = scrobble_user
+        .registered_date
+        .map(|x| "\n\nSince ".to_owned() + &utils::format_epoch_secs(x, false))
+        .unwrap_or_default();
+
     let text = format!(
-        "{}\n\n{} artists\n{} albums\n{} tracks\n{} plays",
+        "{}\n\n{} artists\n{} albums\n{} tracks\n{} plays{}",
         utils::name_with_link(&from, &user),
         scrobble_user.artist_count.to_formatted_string(&Locale::en),
         scrobble_user.album_count.to_formatted_string(&Locale::en),
         scrobble_user.track_count.to_formatted_string(&Locale::en),
         scrobble_user.playcount.to_formatted_string(&Locale::en),
+        scrobbling_since,
     );
 
-    let media =
-        InputMediaPhoto::new(InputFile::url(Url::parse(&profile_pic_url).unwrap())).caption(text);
+    let media = InputMediaPhoto::new(InputFile::url(Url::parse(&profile_pic_url).unwrap()))
+        .caption(text)
+        .parse_mode(ParseMode::Html);
 
-    utils::send_or_edit_photo(bot, media, msg, inline_message_id.as_ref(), edit, None).await?;
+    utils::send_or_edit_photo(
+        bot,
+        media,
+        msg,
+        inline_message_id.as_ref(),
+        edit,
+        None,
+        false,
+    )
+    .await?;
     Ok(())
 }
 
@@ -1253,7 +1285,12 @@ async fn compat_command(
                 "{} and {} listen to {}\n\nCompatibility score is {}%, based on {}",
                 utils::name_with_link(user1, &db_user1_u),
                 utils::name_with_link(user2, &db_user2_u),
-                mutual.join(", ") + "...",
+                mutual
+                    .iter()
+                    .map(|x| utils::replace_html_symbols(x))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+                    + "...",
                 score,
                 period_text,
             )
@@ -1403,9 +1440,9 @@ async fn inline_result_handler(
                 None,
                 chosen_inline_result.inline_message_id,
                 from,
-                false,
-                StatusType::Expanded,
                 true,
+                StatusType::Expanded,
+                false,
                 user,
             )
             .await?;
@@ -1630,7 +1667,7 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
                 "0 loading",
             )]]);
             let media = InputMediaPhoto::new(InputFile::url(Url::parse(consts::URL_3X3).unwrap()))
-                .caption("loawding...");
+                .caption(consts::LOADING);
 
             utils::send_or_edit_photo(
                 bot.clone(),
@@ -1639,6 +1676,7 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
                 q.inline_message_id.as_ref(),
                 true,
                 Some(keyboard),
+                false,
             )
             .await?;
 

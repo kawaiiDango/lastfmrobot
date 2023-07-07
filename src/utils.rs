@@ -3,6 +3,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use chrono::{DateTime, Utc};
 use once_cell::sync::Lazy;
 use teloxide::{
     adaptors::Throttle,
@@ -12,14 +13,14 @@ use teloxide::{
     },
     requests::Requester,
     types::{
-        InlineKeyboardMarkup, InputMedia, InputMediaPhoto, Message, MessageEntity,
+        InlineKeyboardMarkup, InputFile, InputMedia, InputMediaPhoto, Message, MessageEntity,
         MessageEntityKind, ParseMode,
     },
 };
 
 use crate::{
     api_requester::{ApiType, EntryType, TimePeriod},
-    db,
+    config, db,
 };
 
 static TIMEAGO: Lazy<timeago::Formatter> = Lazy::new(timeago::Formatter::new);
@@ -114,7 +115,21 @@ pub async fn send_or_edit_message(
             if keyboard.is_some() {
                 x = x.reply_markup(keyboard.unwrap())
             }
-            x.await?;
+            match x.await {
+                Ok(_) => {
+                    return Ok(());
+                }
+                Err(e) => {
+                    if e.to_string().contains(
+                        "Bad Request: not enough rights to send text messages to the chat",
+                    ) {
+                        bot.leave_chat(m.chat.id).await?;
+                    } else if e.to_string().contains("Bad Request: can't parse entities:") {
+                        log::error!("can't parse: {text}");
+                    }
+                    return Err(Box::new(e));
+                }
+            }
         } else {
             let mut x = bot
                 .edit_message_text(m.chat.id, m.id, text)
@@ -146,6 +161,7 @@ pub async fn send_or_edit_photo(
     inline_message_id: Option<&String>,
     edit: bool,
     keyboard: Option<InlineKeyboardMarkup>,
+    create_file_id: bool,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     if msg.is_some() {
         let m = &msg.unwrap();
@@ -159,7 +175,19 @@ pub async fn send_or_edit_photo(
             if keyboard.is_some() {
                 x = x.reply_markup(keyboard.unwrap())
             }
-            x.await?;
+            match x.await {
+                Ok(_) => {
+                    return Ok(());
+                }
+                Err(e) => {
+                    if e.to_string()
+                        .contains("Bad Request: not enough rights to send photos to the chat")
+                    {
+                        bot.leave_chat(m.chat.id).await?;
+                    }
+                    return Err(Box::new(e));
+                }
+            }
         } else {
             let mut x = bot.edit_message_media(m.chat.id, m.id, InputMedia::Photo(media));
             if keyboard.is_some() {
@@ -168,13 +196,36 @@ pub async fn send_or_edit_photo(
             x.await?;
         }
     } else if inline_message_id.is_some() && edit {
+        // send the photo to the dump chat to get a file id.
+        let new_media = if create_file_id {
+            let dump_msg = bot
+                .send_photo(config::INLINE_IMAGES_DUMP_CHAT_ID.to_string(), media.media)
+                .await?;
+
+            InputMediaPhoto::new(InputFile::file_id(
+                dump_msg
+                    .photo()
+                    .unwrap()
+                    .iter()
+                    .last() // last is the largest
+                    .unwrap()
+                    .file
+                    .id
+                    .clone(),
+            ))
+            .caption(media.caption.unwrap_or_default())
+            .parse_mode(ParseMode::Html)
+        } else {
+            media
+        };
+
         let mut x =
-            bot.edit_message_media_inline(inline_message_id.unwrap(), InputMedia::Photo(media));
+            bot.edit_message_media_inline(inline_message_id.unwrap(), InputMedia::Photo(new_media));
         if keyboard.is_some() {
             x = x.reply_markup(keyboard.unwrap())
         }
         x.await?;
-    };
+    }
 
     Ok(())
 }
@@ -194,6 +245,17 @@ pub fn convert_to_timeago(seconds: u64) -> String {
     let duration = Duration::from_secs(current_time - seconds);
 
     TIMEAGO.convert(duration)
+}
+
+pub fn format_epoch_secs(seconds: u64, with_time: bool) -> String {
+    let d = UNIX_EPOCH + Duration::from_secs(seconds);
+    let datetime = DateTime::<Utc>::from(d);
+    let fmt_str = if with_time {
+        "%Y-%m-%d %H:%M:%S"
+    } else {
+        "%Y-%m-%d"
+    };
+    datetime.format(fmt_str).to_string()
 }
 
 // collage 3 1month
