@@ -685,7 +685,7 @@ fn time_period_to_api_string<'a>(duration: &'a TimePeriod, api_type: &'a ApiType
             TimePeriod::OneMonth => "1month",
             TimePeriod::ThreeMonths => "3month",
             TimePeriod::SixMonths => "6month",
-            TimePeriod::OneYear => "1year",
+            TimePeriod::OneYear => "12month",
             TimePeriod::AllTime => "overall",
         },
         ApiType::Listenbrainz => match duration {
