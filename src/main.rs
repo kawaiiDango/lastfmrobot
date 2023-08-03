@@ -1209,10 +1209,10 @@ async fn compat_command(
     db_user1_u: User,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let user1 = msg.from().unwrap();
-    let user2 = match msg.reply_to_message() {
-        Some(m) => m.from().unwrap(),
-        None => {
-            utils::send_or_edit_message(
+    let reply_to_msg =  msg.reply_to_message();
+
+    if reply_to_msg.is_none() || reply_to_msg.unwrap().from().is_none() {
+                    utils::send_or_edit_message(
                 bot,
                 consts::COMPAT_CLICK,
                 msg.into(),
@@ -1224,8 +1224,9 @@ async fn compat_command(
             .await?;
 
             return Ok(());
-        }
-    };
+    }
+
+    let user2 = reply_to_msg.unwrap().from().unwrap();
     let db_user2 = DB.lock().unwrap().fetch_user(user2.id.0);
 
     let text: String = if user1.id.0 == user2.id.0 {
@@ -1620,7 +1621,7 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
         "info" => {
             if user.api_type() == ApiType::Lastfm && q.message.is_some() {
                 let msg = q.message.unwrap();
-                let msg_text = msg.text().unwrap().to_string();
+                let msg_text = msg.text().unwrap_or_default().to_string();
                 let itatic_entity = utils::find_first_entity(&msg, MessageEntityKind::Italic);
                 let bold_entity = utils::find_first_entity(&msg, MessageEntityKind::Bold);
 

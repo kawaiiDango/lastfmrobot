@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-teloxide = { version = "0.12", features = ["macros", "throttle"] }
+teloxide = { git = "https://github.com/teloxide/teloxide.git", features = ["macros", "throttle"] }
 log = "0.4"
 pretty_env_logger = "0.5"
 tokio = { version =  "1.28", features = ["full"] }
@@ -17,7 +17,7 @@ image = "0.24.6"
 imageproc = "0.23.0"
 rusttype = "0.9.3"
 url-escape = "0.1.1"
-http-cache-reqwest = { version = "0.10.0", features = ["manager-moka"] }
+http-cache-reqwest = { version = "0.11.0", features = ["manager-moka"] }
 reqwest-middleware = "0.2.2"
 num-format = "0.4.4"
 bytes = "1.4.0"

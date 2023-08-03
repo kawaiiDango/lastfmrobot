@@ -169,13 +169,16 @@ pub static CLIENT: Lazy<ClientWithMiddleware> = Lazy::new(|| {
                 .time_to_live(Duration::from_secs(300))
                 .build(),
         ),
-        options: CacheOptions {
-            shared: false,
-            cache_heuristic: 0.1, // 10% matches IE
-            immutable_min_time_to_live: Duration::from_secs(300),
-            ignore_cargo_cult: true,
-        }
-        .into(),
+        options: http_cache_reqwest::HttpCacheOptions {
+            cache_options: CacheOptions {
+                shared: false,
+                cache_heuristic: 0.1, // 10% matches IE
+                immutable_min_time_to_live: Duration::from_secs(300),
+                ignore_cargo_cult: true,
+            }
+            .into(),
+            cache_key: None,
+        },
     }))
     .build()
 });
