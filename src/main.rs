@@ -1209,21 +1209,21 @@ async fn compat_command(
     db_user1_u: User,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let user1 = msg.from().unwrap();
-    let reply_to_msg =  msg.reply_to_message();
+    let reply_to_msg = msg.reply_to_message();
 
     if reply_to_msg.is_none() || reply_to_msg.unwrap().from().is_none() {
-                    utils::send_or_edit_message(
-                bot,
-                consts::COMPAT_CLICK,
-                msg.into(),
-                None,
-                false,
-                None,
-                true,
-            )
-            .await?;
+        utils::send_or_edit_message(
+            bot,
+            consts::COMPAT_CLICK,
+            msg.into(),
+            None,
+            false,
+            None,
+            true,
+        )
+        .await?;
 
-            return Ok(());
+        return Ok(());
     }
 
     let user2 = reply_to_msg.unwrap().from().unwrap();
@@ -1635,16 +1635,9 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
                 let ita = itatic_entity.unwrap();
                 let bol = bold_entity.unwrap();
 
-                let artist = utils::slice_unicode_string(
-                    msg_text.clone(),
-                    ita.offset - 2,
-                    ita.length + ita.offset - 2,
-                );
-                let title = utils::slice_unicode_string(
-                    msg_text,
-                    bol.offset - 2,
-                    bol.length + bol.offset - 2,
-                );
+                let artist =
+                    utils::slice_tg_string(msg_text.clone(), ita.offset, ita.length + ita.offset);
+                let title = utils::slice_tg_string(msg_text, bol.offset, bol.length + bol.offset);
 
                 let lastfm_username = user.account_username;
 

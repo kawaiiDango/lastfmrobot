@@ -79,19 +79,27 @@ pub fn name_with_link(tg_user: &teloxide::types::User, db_user: &db::User) -> St
     }
 }
 
-pub fn slice_unicode_string(text: String, start_inclusive: usize, end_exclusive: usize) -> String {
-    let mut char_indices = text.char_indices();
-    let start_byte = match char_indices.nth(start_inclusive) {
-        Some((byte_index, _)) => byte_index,
-        None => text.len(),
-    };
+pub fn slice_tg_string(s: String, start: usize, end: usize) -> String {
+    let mut utf16_len = 0;
+    let mut start_byte = None;
+    let mut end_byte = None;
 
-    let end_byte = match char_indices.nth(end_exclusive - start_inclusive - 1) {
-        Some((byte_index, _)) => byte_index,
-        None => text.len(),
-    };
+    for (i, ch) in s.char_indices() {
+        if utf16_len == start {
+            start_byte = Some(i);
+        }
+        if utf16_len == end {
+            end_byte = Some(i);
+            break;
+        }
+        utf16_len += ch.len_utf16();
+    }
 
-    text[start_byte..end_byte].to_string()
+    if start_byte.is_none() || end_byte.is_none() {
+        panic!("start or end index is out of bounds");
+    }
+
+    s[start_byte.unwrap()..end_byte.unwrap()].to_string()
 }
 
 pub async fn send_or_edit_message(
