@@ -755,9 +755,10 @@ async fn user_settings_command(
         ));
     }
 
+    let name_text = utils::name_with_link(&from, &user);
     utils::send_or_edit_message(
         bot,
-        &format!("Settings for {}", from.first_name),
+        &format!("Settings for {}", name_text),
         msg,
         inline_message_id,
         edit,
