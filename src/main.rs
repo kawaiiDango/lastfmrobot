@@ -1640,11 +1640,16 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
                     utils::slice_tg_string(msg_text.clone(), ita.offset, ita.length + ita.offset);
                 let title = utils::slice_tg_string(msg_text, bol.offset, bol.length + bol.offset);
 
+                if artist.is_none() || title.is_none() {
+                    bot.answer_callback_query(q.id)
+                        .text(consts::NOT_FOUND)
+                        .await?;
+                    return Ok(());
+                }
+
                 let lastfm_username = user.account_username;
 
-                log::info!("'{artist}' '{title}'");
-
-                let infos = fetch_lastfm_infos(lastfm_username, artist, title)
+                let infos = fetch_lastfm_infos(lastfm_username, artist.unwrap(), title.unwrap())
                     .await
                     .unwrap_or(consts::NOT_FOUND.to_owned());
                 bot.answer_callback_query(q.id)

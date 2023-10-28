@@ -79,7 +79,7 @@ pub fn name_with_link(tg_user: &teloxide::types::User, db_user: &db::User) -> St
     }
 }
 
-pub fn slice_tg_string(s: String, start: usize, end: usize) -> String {
+pub fn slice_tg_string(s: String, start: usize, end: usize) -> Option<String> {
     let mut utf16_len = 0;
     let mut start_byte = None;
     let mut end_byte = None;
@@ -96,10 +96,10 @@ pub fn slice_tg_string(s: String, start: usize, end: usize) -> String {
     }
 
     if start_byte.is_none() || end_byte.is_none() {
-        panic!("start or end index is out of bounds");
+        return None;
     }
 
-    s[start_byte.unwrap()..end_byte.unwrap()].to_string()
+    Some(s[start_byte.unwrap()..end_byte.unwrap()].to_string())
 }
 
 pub async fn send_or_edit_message(
