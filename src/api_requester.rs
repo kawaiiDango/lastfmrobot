@@ -178,6 +178,8 @@ pub static CLIENT: Lazy<ClientWithMiddleware> = Lazy::new(|| {
             }
             .into(),
             cache_key: None,
+            cache_mode_fn: None,
+            cache_bust: None,
         },
     }))
     .build()
