@@ -24,6 +24,16 @@ pub const ANON_KUN: &str = "Hieee anon kun";
 pub const ITS_ME: &str = "Lookie, its me!!!";
 pub const LOADING: &str = "lOwOding...";
 pub const MESSAGE_UNMODIFIED: &str = "No updates from your profile";
-pub const URL_3X3_ALBUM: &str =
-    "https://kawaiidango.gitlab.io/static/img/inlinePreviews/lastfm/3x3album.jpg";
+pub const URL_3X3_ALBUM_1W: &str =
+    "https://kawaiidango.gitlab.io/static/img/inlinePreviews/lastfm/1w_album_collage.jpg";
+pub const URL_3X3_ALBUM_1M: &str =
+    "https://kawaiidango.gitlab.io/static/img/inlinePreviews/lastfm/1m_album_collage.jpg";
+pub const URL_3X3_ALBUM_3M: &str =
+    "https://kawaiidango.gitlab.io/static/img/inlinePreviews/lastfm/3m_album_collage.jpg";
+pub const URL_3X3_ALBUM_6M: &str =
+    "https://kawaiidango.gitlab.io/static/img/inlinePreviews/lastfm/6m_album_collage.jpg";
+pub const URL_3X3_ALBUM_1Y: &str =
+    "https://kawaiidango.gitlab.io/static/img/inlinePreviews/lastfm/1y_album_collage.jpg";
+pub const URL_3X3_ALBUM_OVERALL: &str =
+    "https://kawaiidango.gitlab.io/static/img/inlinePreviews/lastfm/overall_album_collage.jpg";
 pub const URL_3X3: &str = "https://kawaiidango.gitlab.io/static/img/inlinePreviews/lastfm/3x3.jpg";

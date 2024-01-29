@@ -1347,10 +1347,45 @@ async fn inline_query_handler(
     )
     .reply_markup(keyboard.clone());
 
-    let collage3 = InlineQueryResultPhoto::new(
-        "collage 3",
-        Url::parse(consts::URL_3X3_ALBUM)?,
-        Url::parse(consts::URL_3X3_ALBUM)?,
+    let collage1w = InlineQueryResultPhoto::new(
+        "collage 3 1w",
+        Url::parse(consts::URL_3X3_ALBUM_1W)?,
+        Url::parse(consts::URL_3X3_ALBUM_1W)?,
+    )
+    .reply_markup(keyboard.clone());
+
+    let collage1m = InlineQueryResultPhoto::new(
+        "collage 3 1m",
+        Url::parse(consts::URL_3X3_ALBUM_1M)?,
+        Url::parse(consts::URL_3X3_ALBUM_1M)?,
+    )
+    .reply_markup(keyboard.clone());
+
+    let collage3m = InlineQueryResultPhoto::new(
+        "collage 3 3m",
+        Url::parse(consts::URL_3X3_ALBUM_3M)?,
+        Url::parse(consts::URL_3X3_ALBUM_3M)?,
+    )
+    .reply_markup(keyboard.clone());
+
+    let collage6m = InlineQueryResultPhoto::new(
+        "collage 3 6m",
+        Url::parse(consts::URL_3X3_ALBUM_6M)?,
+        Url::parse(consts::URL_3X3_ALBUM_6M)?,
+    )
+    .reply_markup(keyboard.clone());
+
+    let collage1y = InlineQueryResultPhoto::new(
+        "collage 3 1y",
+        Url::parse(consts::URL_3X3_ALBUM_1Y)?,
+        Url::parse(consts::URL_3X3_ALBUM_1Y)?,
+    )
+    .reply_markup(keyboard.clone());
+
+    let collage_overall = InlineQueryResultPhoto::new(
+        "collage 3 overall",
+        Url::parse(consts::URL_3X3_ALBUM_OVERALL)?,
+        Url::parse(consts::URL_3X3_ALBUM_OVERALL)?,
     )
     .reply_markup(keyboard.clone());
 
@@ -1372,9 +1407,14 @@ async fn inline_query_handler(
         InlineQueryResult::Article(status),
         InlineQueryResult::Article(status_full),
         InlineQueryResult::Article(loved),
-        InlineQueryResult::Article(random),
         InlineQueryResult::Article(flex),
-        InlineQueryResult::Photo(collage3),
+        InlineQueryResult::Article(random),
+        InlineQueryResult::Photo(collage1w),
+        InlineQueryResult::Photo(collage1m),
+        InlineQueryResult::Photo(collage3m),
+        InlineQueryResult::Photo(collage6m),
+        InlineQueryResult::Photo(collage1y),
+        InlineQueryResult::Photo(collage_overall),
     ];
 
     if user.is_none() {

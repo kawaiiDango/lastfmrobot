@@ -268,7 +268,7 @@ pub fn format_epoch_secs(seconds: u64, with_time: bool) -> String {
 
 // collage 3 1month
 pub fn parse_collage_arg(arg: &str) -> (u32, TimePeriod, EntryType, bool) {
-    let splits = arg.splitn(3, ' ').collect::<Vec<&str>>();
+    let splits = arg.splitn(4, ' ').collect::<Vec<&str>>();
 
     let mut size = 3;
     let mut period = TimePeriod::AllTime;
@@ -295,21 +295,31 @@ pub fn parse_collage_arg(arg: &str) -> (u32, TimePeriod, EntryType, bool) {
             } else {
                 entry_type_found = false;
             }
+
+            if entry_type_found {
+                continue;
+            }
         }
 
         let fragment = truncate_str(split, 4);
 
         if !size_found {
-            let parsed = fragment.parse::<u32>();
+            // parse nxn or just n
+
+            let fragment_splits = fragment.splitn(2, 'x').collect::<Vec<&str>>();
+
+            let parsed = fragment_splits.first().unwrap().parse::<u32>();
             if parsed.is_ok() {
                 let s = parsed.ok().unwrap_or_default();
 
                 if s > 0 && s <= 7 {
                     size = s;
                     size_found = true;
+                    continue;
                 }
             }
         }
+
         if !period_found {
             let is_day = fragment.contains('d');
             let is_week = fragment.contains('w');
@@ -317,7 +327,7 @@ pub fn parse_collage_arg(arg: &str) -> (u32, TimePeriod, EntryType, bool) {
             let is_year = fragment.contains('y');
             let is_all = fragment.contains('o') || fragment.contains("all");
 
-            let first_digit = &split.get(0..1).unwrap_or_default().parse::<i32>();
+            let first_digit = &split.get(0..1).unwrap_or_default().parse::<u32>();
 
             if first_digit.as_ref().is_ok() {
                 let first_digit_u = first_digit.clone().ok().unwrap_or_default();
