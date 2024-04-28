@@ -7,13 +7,13 @@ use std::{
     error::Error,
     fs::File,
     io::{BufRead, BufReader},
-    sync::Mutex,
+    sync::{LazyLock, Mutex, OnceLock},
 };
 
 use api_requester::{ApiType, TimePeriod};
+use chrono::{Duration, Utc};
 use db::{Db, User};
 use num_format::{Locale, ToFormattedString};
-use once_cell::sync::{Lazy, OnceCell};
 use rand::seq::SliceRandom;
 use reqwest::Url;
 use strum_macros::{Display, EnumString, IntoStaticStr};
@@ -90,14 +90,8 @@ enum Command {
     Help,
 }
 
-static DB: Lazy<Mutex<Db>> = Lazy::new(|| Mutex::new(Db::new()));
-static ME: OnceCell<Me> = OnceCell::new();
-static ACCEPTABLE_TAGS: Lazy<HashSet<String>> = Lazy::new(|| {
-    BufReader::new(File::open("everynoise_genres.txt").unwrap())
-        .lines()
-        .map(|x| x.unwrap())
-        .collect()
-});
+static DB: LazyLock<Mutex<Db>> = LazyLock::new(|| Mutex::new(Db::new()));
+static ME: OnceLock<Me> = OnceLock::new();
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -181,16 +175,16 @@ async fn message_handler(bot: Bot, msg: Message) -> Result<(), Box<dyn Error + S
         // commands without a /
         if parsed_command.is_err() {
             let splits: Vec<_> = text.splitn(2, ' ').map(|x| x.to_lowercase()).collect();
-            let first_word = splits.get(0).map(|x| x.as_str()); //.cloned();
+            let first_word = splits.first().map(|x| x.as_str()); //.cloned();
             let second_word = splits.get(1).cloned();
 
             parsed_command = match first_word {
                 Some("status") => Ok(Command::Status),
                 Some("statusfull") => Ok(Command::Status_Full),
                 Some("collage") => {
-                    if second_word.is_some() {
+                    if let Some(second_word_value) = second_word {
                         Ok(Command::Collage {
-                            arg: second_word.unwrap(),
+                            arg: second_word_value,
                         })
                     } else {
                         parsed_command
@@ -395,6 +389,13 @@ async fn status_command(
     prefer_cached: bool,
     user: User,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    static ACCEPTABLE_TAGS: LazyLock<HashSet<String>> = LazyLock::new(|| {
+        BufReader::new(File::open("everynoise_genres.txt").unwrap())
+            .lines()
+            .map(|x| x.unwrap())
+            .collect()
+    });
+
     let from = utils::choose_the_from(msg.as_ref(), inline_from);
 
     let limit = if status_type == StatusType::Expanded {
@@ -502,7 +503,7 @@ async fn status_command(
                         first_track_info,
                     );
 
-                    first_track_info = "".to_owned();
+                    first_track_info = String::new();
                     s
                 })
                 .collect::<Vec<String>>()
@@ -671,7 +672,7 @@ async fn set_command(
 
     let recent_tracks = api_requester::fetch_recent_tracks(username, &api_type, false, 1).await;
 
-    let buttons = vec![ApiType::Lastfm, ApiType::Listenbrainz, ApiType::Librefm]
+    let buttons = [ApiType::Lastfm, ApiType::Listenbrainz, ApiType::Librefm]
         .iter()
         .filter(|&x| x != &api_type)
         .map(|x| {
@@ -1577,9 +1578,9 @@ async fn fetch_lastfm_infos(
         .await?
         .map(|e| {
             format!(
-                "🎵 {}{}:\n{} plays\n{} 🌎 listeners\n{} 🌎 scrobbles",
+                "🎵 {} ({}):\n{} plays\n{} 🌎 listeners\n{} 🌎 scrobbles",
                 e.name,
-                format!(" ({})", utils::human_readable_duration(e.duration)),
+                utils::human_readable_duration(e.duration),
                 e.user_playcount.to_formatted_string(&Locale::en),
                 e.listeners.to_formatted_string(&Locale::en),
                 e.playcount.to_formatted_string(&Locale::en)
@@ -1603,6 +1604,16 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
         "".to_owned()
     };
     let from = &q.from;
+
+    // message content and message date will not be available if the message is too old.
+    let message_date = q.message.as_ref().map(|m| m.date);
+
+    if message_date.is_none() || Utc::now() - message_date.unwrap() > Duration::hours(48) {
+        bot.answer_callback_query(q.id)
+            .text(consts::MESSAGE_TOO_OLD)
+            .await?;
+        return Ok(());
+    }
 
     // 0 means everyone is allowed to click
     if allowed_user_id != 0 && allowed_user_id != from.id.0 {

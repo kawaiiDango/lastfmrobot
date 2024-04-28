@@ -1,11 +1,10 @@
 // from https://github.com/arsenron/amplitude
 
 use std::{
-    sync::Mutex,
+    sync::{LazyLock, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use once_cell::sync::Lazy;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
@@ -34,7 +33,7 @@ struct Event {
 const MAX_EVENTS_TO_TRIGGER_SEND: usize = 50; // todo increase later
 const URL_BATCH: &str = "https://api2.amplitude.com/batch";
 const DEFAULT_SERVER_ERROR: &str = r#"{"error": "Some kind of server error"}"#;
-static EVENTS_BUFFER: Lazy<Mutex<Vec<Event>>> = Lazy::new(|| Mutex::new(Vec::new()));
+static EVENTS_BUFFER: LazyLock<Mutex<Vec<Event>>> = LazyLock::new(|| Mutex::new(Vec::new()));
 
 pub async fn add_event(
     event_type: &str,
@@ -47,23 +46,28 @@ pub async fn add_event(
         .unwrap_or_default();
     let language_code = user.cloned().map(|x| x.language_code).unwrap_or_default();
 
-    EVENTS_BUFFER.lock().unwrap().push(Event {
-        event_type: event_type.to_string().into(),
-        user_id: user_id.into(),
-        platform: bot_username.into(),
-        time: Some(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
-        ),
-        language: language_code,
-        ip: "$remote".to_string().into(),
-    });
+    if let Ok(mut buffer) = EVENTS_BUFFER.lock() {
+        buffer.push(Event {
+            event_type: event_type.to_string().into(),
+            user_id: user_id.into(),
+            platform: bot_username.into(),
+            time: Some(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64,
+            ),
+            language: language_code,
+            ip: "$remote".to_string().into(),
+        });
+    }
 
     if EVENTS_BUFFER.lock().unwrap().len() > MAX_EVENTS_TO_TRIGGER_SEND {
         send().await?;
-        EVENTS_BUFFER.lock().unwrap().clear();
+
+        if let Ok(mut buffer) = EVENTS_BUFFER.lock() {
+            buffer.clear();
+        }
     }
     Ok(())
 }

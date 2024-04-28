@@ -1,12 +1,11 @@
-use std::{error::Error, time::Duration};
+use std::{error::Error, sync::LazyLock, time::Duration};
 
+use http::Extensions;
 use http_cache_reqwest::{Cache, CacheMode, CacheOptions, HttpCache, MokaManager};
-use once_cell::sync::Lazy;
 use reqwest::{header::HeaderValue, Request, Response, StatusCode, Url};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware, Middleware, Next};
 use serde_json::Value;
 use strum_macros::{Display, EnumString, IntoStaticStr};
-use task_local_extensions::Extensions;
 
 use crate::{config, consts};
 
@@ -151,7 +150,7 @@ impl Middleware for Response200Middleware {
     }
 }
 
-pub static CLIENT: Lazy<ClientWithMiddleware> = Lazy::new(|| {
+pub static CLIENT: LazyLock<ClientWithMiddleware> = LazyLock::new(|| {
     ClientBuilder::new(
         reqwest::ClientBuilder::new()
             .timeout(Duration::from_secs(25))
@@ -185,7 +184,7 @@ pub static CLIENT: Lazy<ClientWithMiddleware> = Lazy::new(|| {
     .build()
 });
 
-pub static CLIENT_NOCACHE: Lazy<ClientWithMiddleware> = Lazy::new(|| {
+pub static CLIENT_NOCACHE: LazyLock<ClientWithMiddleware> = LazyLock::new(|| {
     ClientBuilder::new(
         reqwest::ClientBuilder::new()
             .timeout(Duration::from_secs(25))

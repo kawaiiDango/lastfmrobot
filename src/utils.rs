@@ -1,10 +1,10 @@
 use std::{
     error::Error,
+    sync::LazyLock,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use chrono::{DateTime, Utc};
-use once_cell::sync::Lazy;
 use teloxide::{
     adaptors::Throttle,
     payloads::{
@@ -22,8 +22,6 @@ use crate::{
     api_requester::{ApiType, EntryType, TimePeriod},
     config, db,
 };
-
-static TIMEAGO: Lazy<timeago::Formatter> = Lazy::new(timeago::Formatter::new);
 
 pub fn replace_html_symbols(text: &str) -> String {
     text.replace('&', "&amp;")
@@ -246,13 +244,15 @@ fn truncate_str(s: &str, max_chars: usize) -> &str {
 }
 
 pub fn convert_to_timeago(seconds: u64) -> String {
+    static FORMATTER: LazyLock<timeago::Formatter> = LazyLock::new(timeago::Formatter::new);
+
     let current_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs();
     let duration = Duration::from_secs(current_time - seconds);
 
-    TIMEAGO.convert(duration)
+    FORMATTER.convert(duration)
 }
 
 pub fn format_epoch_secs(seconds: u64, with_time: bool) -> String {

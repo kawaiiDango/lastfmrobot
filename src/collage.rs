@@ -1,21 +1,19 @@
+use std::sync::LazyLock;
+
+use ab_glyph::FontVec;
 use anyhow::anyhow;
 use bytes::Bytes;
 use image::codecs::jpeg::JpegEncoder;
 use image::{ImageBuffer, Rgba, RgbaImage};
 use imageproc::drawing::draw_text_mut;
-use once_cell::sync::Lazy;
-use rusttype::{Font, Scale};
 
 use crate::api_requester::{Album, CLIENT_NOCACHE};
+use crate::config;
 
 const FONT_SIZE: f32 = 24.0;
 const TILE_PX: u32 = 300;
 pub const MAX_SIZE: u32 = 7;
 pub const MIN_SIZE: u32 = 1;
-static FONT: Lazy<Font> = Lazy::new(|| {
-    let font_data = std::fs::read("NotoSansCJKtc-Medium.ttf").ok().unwrap();
-    Font::try_from_vec(font_data).unwrap()
-});
 
 async fn fetch_album_arts(albums: &[&Album]) -> Vec<Result<Bytes, anyhow::Error>> {
     let mut handles = Vec::new();
@@ -51,6 +49,11 @@ pub async fn create_collage(
     size: u32,
     text: bool,
 ) -> Result<Vec<u8>, anyhow::Error> {
+    static FONT: LazyLock<FontVec> = LazyLock::new(|| {
+        let font_data = std::fs::read(config::FONT_FILE_PATH).expect("Failed to read font file");
+        FontVec::try_from_vec(font_data).expect("Error constructing Font")
+    });
+
     let collage_size: u32 = TILE_PX * size;
 
     let mut collage = ImageBuffer::from_pixel(collage_size, collage_size, Rgba([0, 0, 0, 255]));
@@ -87,8 +90,8 @@ pub async fn create_collage(
         // Draw text
 
         if text {
-            let text_color = Rgba([255, 255, 255, 255]);
-            let outline_color = Rgba([0, 0, 0, 255]);
+            let text_color = Rgba([255u8, 255, 255, 255]);
+            let outline_color = Rgba([0u8, 0, 0, 255]);
             let mut text_image = RgbaImage::from_pixel(TILE_PX, TILE_PX, Rgba([0, 0, 0, 0]));
 
             let mut draw_text = |x: i32, y: i32, text: &str, fg: bool| {
@@ -97,8 +100,8 @@ pub async fn create_collage(
                     if fg { text_color } else { outline_color },
                     x,
                     y,
-                    Scale::uniform(FONT_SIZE),
-                    &FONT,
+                    FONT_SIZE,
+                    &*FONT,
                     text,
                 )
             };

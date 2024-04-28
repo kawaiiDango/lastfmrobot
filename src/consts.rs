@@ -24,6 +24,7 @@ pub const ANON_KUN: &str = "Hieee anon kun";
 pub const ITS_ME: &str = "Lookie, its me!!!";
 pub const LOADING: &str = "lOwOding...";
 pub const MESSAGE_UNMODIFIED: &str = "No updates from your profile";
+pub const MESSAGE_TOO_OLD: &str = "This message is too old and can't be edited";
 pub const URL_3X3_ALBUM_1W: &str =
     "https://kawaiidango.gitlab.io/static/img/inlinePreviews/lastfm/1w_album_collage.jpg";
 pub const URL_3X3_ALBUM_1M: &str =

@@ -3,3 +3,5 @@ pub const LASTFM_API_KEY: &str = "";
 pub const OWNER_ID: &str = "";
 pub const INLINE_IMAGES_DUMP_CHAT_ID: &str = "";
 pub const AMPLITUDE_KEY: &str = "";
+// get one from https://github.com/notofonts/noto-cjk or something and put the path relative to the root dir of the project
+pub const FONT_FILE_PATH: &str = "NotoSansCJK-Medium.ttc";
