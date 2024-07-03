@@ -25,6 +25,12 @@ pub const ITS_ME: &str = "Lookie, its me!!!";
 pub const LOADING: &str = "lOwOding...";
 pub const MESSAGE_UNMODIFIED: &str = "No updates from your profile";
 pub const MESSAGE_TOO_OLD: &str = "This message is too old and can't be edited";
+pub const PRIVACY_POLICY: &str = r#"The bot, LastFM Robot stores a mapping of the user's Telegram ID, 
+to their scrobbling service (Lastfm, Librefm or ListenBrainz) username and the user's bot preferences.
+
+This information is used to fetch and display the user's scrobble information and for overall analytics.
+
+The user may choose to delete this information and unlink themselves from the bot, by using the /unset command."#;
 pub const URL_3X3_ALBUM_1W: &str =
     "https://kawaiidango.gitlab.io/static/img/inlinePreviews/lastfm/1w_album_collage.jpg";
 pub const URL_3X3_ALBUM_1M: &str =

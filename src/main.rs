@@ -1,4 +1,3 @@
-#![feature(lazy_cell)]
 #![feature(iter_collect_into)]
 
 use std::{
@@ -88,6 +87,8 @@ enum Command {
     User_Settings,
     #[command(description = "Weeeeelp!")]
     Help,
+    #[command(description = "Priwacy powicy")]
+    Privacy,
 }
 
 static DB: LazyLock<Mutex<Db>> = LazyLock::new(|| Mutex::new(Db::new()));
@@ -121,6 +122,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         "topkek",
         "flex",
         "user_settings",
+        "help",
+        "privacy",
     ]
     .into_iter()
     .collect();
@@ -215,6 +218,14 @@ async fn message_handler(bot: Bot, msg: Message) -> Result<(), Box<dyn Error + S
             Ok(Command::Set { arg }) => {
                 set_command(bot.clone(), msg.clone(), None, &arg, false).await?;
                 track("set", from).await;
+                return Ok(());
+            }
+            Ok(Command::Privacy) => {
+                bot.send_message(msg.chat.id, consts::PRIVACY_POLICY)
+                    .reply_to_message_id(msg.id)
+                    .allow_sending_without_reply(true)
+                    .await?;
+                track("privacy", from).await;
                 return Ok(());
             }
             Ok(_) => {
