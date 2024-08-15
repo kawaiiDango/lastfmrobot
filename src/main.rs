@@ -22,8 +22,9 @@ use teloxide::{
     prelude::*,
     types::{
         BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResult,
-        InlineQueryResultArticle, InlineQueryResultPhoto, InputFile, InputMediaPhoto,
-        InputMessageContent, InputMessageContentText, Me, MessageEntityKind, ParseMode,
+        InlineQueryResultArticle, InlineQueryResultPhoto, InlineQueryResultsButton,
+        InlineQueryResultsButtonKind, InputFile, InputMediaPhoto, InputMessageContent,
+        InputMessageContentText, Me, MessageEntityKind, ParseMode,
     },
     utils::command::BotCommands,
 };
@@ -1430,11 +1431,15 @@ async fn inline_query_handler(
     ];
 
     if user.is_none() {
+        let switch_pm_button = InlineQueryResultsButton {
+            text: consts::NOT_REGISTERED_INLINE.to_string(),
+            kind: InlineQueryResultsButtonKind::StartParameter("set".to_string()),
+        };
+
         bot.answer_inline_query(q.id, [])
             .cache_time(0)
             .is_personal(true)
-            .switch_pm_text(consts::NOT_REGISTERED_INLINE)
-            .switch_pm_parameter("set")
+            .button(switch_pm_button)
             .await?;
     } else {
         bot.answer_inline_query(q.id, results)
