@@ -13,8 +13,8 @@ use teloxide::{
     },
     requests::Requester,
     types::{
-        InlineKeyboardMarkup, InputFile, InputMedia, InputMediaPhoto, Message, MessageEntity,
-        MessageEntityKind, ParseMode,
+        InlineKeyboardMarkup, InputFile, InputMedia, InputMediaPhoto, LinkPreviewOptions, Message,
+        MessageEntity, MessageEntityKind, ParseMode, ReplyParameters,
     },
 };
 
@@ -44,7 +44,7 @@ pub fn choose_the_from(
     inline_from: Option<&teloxide::types::User>,
 ) -> teloxide::types::User {
     inline_from
-        .unwrap_or_else(|| msg.as_ref().unwrap().from().unwrap())
+        .unwrap_or_else(|| msg.as_ref().unwrap().from.as_ref().unwrap())
         .clone()
 }
 
@@ -101,9 +101,9 @@ pub fn slice_tg_string(s: String, start: usize, end: usize) -> Option<String> {
 }
 
 pub async fn send_or_edit_message(
-    bot: Throttle<teloxide::Bot>,
+    bot: &Throttle<teloxide::Bot>,
     text: &str,
-    msg: Option<Message>,
+    msg: Option<&Message>,
     inline_message_id: Option<String>,
     edit: bool,
     keyboard: Option<InlineKeyboardMarkup>,
@@ -114,10 +114,15 @@ pub async fn send_or_edit_message(
         if !edit {
             let mut x = bot
                 .send_message(m.chat.id, text)
-                .allow_sending_without_reply(true)
-                .reply_to_message_id(m.id)
+                .reply_parameters(ReplyParameters::new(m.id).allow_sending_without_reply())
                 .parse_mode(ParseMode::Html)
-                .disable_web_page_preview(disable_web_page_preview);
+                .link_preview_options(LinkPreviewOptions {
+                    is_disabled: disable_web_page_preview,
+                    url: None,
+                    prefer_small_media: false,
+                    prefer_large_media: true,
+                    show_above_text: false,
+                });
             if keyboard.is_some() {
                 x = x.reply_markup(keyboard.unwrap())
             }
@@ -140,7 +145,13 @@ pub async fn send_or_edit_message(
             let mut x = bot
                 .edit_message_text(m.chat.id, m.id, text)
                 .parse_mode(ParseMode::Html)
-                .disable_web_page_preview(disable_web_page_preview);
+                .link_preview_options(LinkPreviewOptions {
+                    is_disabled: disable_web_page_preview,
+                    url: None,
+                    prefer_small_media: false,
+                    prefer_large_media: true,
+                    show_above_text: false,
+                });
             if keyboard.is_some() {
                 x = x.reply_markup(keyboard.unwrap())
             }
@@ -161,9 +172,9 @@ pub async fn send_or_edit_message(
 }
 
 pub async fn send_or_edit_photo(
-    bot: Throttle<teloxide::Bot>,
+    bot: &Throttle<teloxide::Bot>,
     media: InputMediaPhoto,
-    msg: Option<Message>,
+    msg: Option<&Message>,
     inline_message_id: Option<&String>,
     edit: bool,
     keyboard: Option<InlineKeyboardMarkup>,
@@ -174,8 +185,7 @@ pub async fn send_or_edit_photo(
         if !edit {
             let mut x = bot
                 .send_photo(m.chat.id, media.media)
-                .allow_sending_without_reply(true)
-                .reply_to_message_id(m.id)
+                .reply_parameters(ReplyParameters::new(m.id).allow_sending_without_reply())
                 .parse_mode(ParseMode::Html)
                 .caption(media.caption.unwrap_or_default());
             if keyboard.is_some() {

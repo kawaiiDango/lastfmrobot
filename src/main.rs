@@ -10,7 +10,6 @@ use std::{
 };
 
 use api_requester::{ApiType, TimePeriod};
-use chrono::{Duration, Utc};
 use db::{Db, User};
 use num_format::{Locale, ToFormattedString};
 use rand::seq::SliceRandom;
@@ -24,7 +23,8 @@ use teloxide::{
         BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResult,
         InlineQueryResultArticle, InlineQueryResultPhoto, InlineQueryResultsButton,
         InlineQueryResultsButtonKind, InputFile, InputMediaPhoto, InputMessageContent,
-        InputMessageContentText, Me, MessageEntityKind, ParseMode,
+        InputMessageContentText, MaybeInaccessibleMessage, Me, MessageEntityKind, ParseMode,
+        ReplyParameters,
     },
     utils::command::BotCommands,
 };
@@ -161,7 +161,7 @@ async fn track(event_type: &str, user: Option<&teloxide::types::User>) {
 
 async fn message_handler(bot: Bot, msg: Message) -> Result<(), Box<dyn Error + Send + Sync>> {
     if let Some(text) = msg.text() {
-        let _from = msg.from().cloned();
+        let _from = msg.from.as_ref().cloned();
         let from = _from.as_ref();
 
         if from.is_none() {
@@ -169,7 +169,7 @@ async fn message_handler(bot: Bot, msg: Message) -> Result<(), Box<dyn Error + S
         }
 
         if from.unwrap().is_anonymous() {
-            utils::send_or_edit_message(bot, consts::ANON_KUN, None, None, false, None, true)
+            utils::send_or_edit_message(&bot, consts::ANON_KUN, None, None, false, None, true)
                 .await?;
             return Ok(());
         }
@@ -204,34 +204,31 @@ async fn message_handler(bot: Bot, msg: Message) -> Result<(), Box<dyn Error + S
         let user: User;
         match parsed_command {
             Ok(Command::Start) => {
-                start_command(bot, msg.chat.id).await?;
+                start_command(&bot, msg.chat.id).await?;
                 track("start", from).await;
                 return Ok(());
             }
             Ok(Command::Help) => {
                 bot.send_message(msg.chat.id, Command::descriptions().to_string())
-                    .reply_to_message_id(msg.id)
-                    .allow_sending_without_reply(true)
+                    .reply_parameters(ReplyParameters::new(msg.id).allow_sending_without_reply())
                     .await?;
                 track("help", from).await;
                 return Ok(());
             }
             Ok(Command::Set { arg }) => {
-                set_command(bot.clone(), msg.clone(), None, &arg, false).await?;
+                set_command(&bot, &msg, None, &arg, false).await?;
                 track("set", from).await;
                 return Ok(());
             }
             Ok(Command::Privacy) => {
                 bot.send_message(msg.chat.id, consts::PRIVACY_POLICY)
-                    .reply_to_message_id(msg.id)
-                    .allow_sending_without_reply(true)
+                    .reply_parameters(ReplyParameters::new(msg.id).allow_sending_without_reply())
                     .await?;
                 track("privacy", from).await;
                 return Ok(());
             }
             Ok(_) => {
-                let u =
-                    get_registered_user(bot.clone(), msg.clone().into(), None, None, false).await;
+                let u = get_registered_user(&bot, Some(&msg), None, None, false).await;
                 if let Ok(u) = u {
                     user = u;
                 } else {
@@ -246,8 +243,8 @@ async fn message_handler(bot: Bot, msg: Message) -> Result<(), Box<dyn Error + S
         match parsed_command {
             Ok(Command::Status) | Ok(Command::Np) => {
                 status_command(
-                    bot,
-                    msg.into(),
+                    &bot,
+                    Some(&msg),
                     None,
                     None,
                     false,
@@ -260,8 +257,8 @@ async fn message_handler(bot: Bot, msg: Message) -> Result<(), Box<dyn Error + S
             }
             Ok(Command::Status_Full) | Ok(Command::NpFull) => {
                 status_command(
-                    bot,
-                    msg.into(),
+                    &bot,
+                    Some(&msg),
                     None,
                     None,
                     false,
@@ -273,35 +270,35 @@ async fn message_handler(bot: Bot, msg: Message) -> Result<(), Box<dyn Error + S
                 track("status_full", from).await;
             }
             Ok(Command::Loved) => {
-                loved_command(bot, msg.into(), None, None, false, user).await?;
+                loved_command(&bot, Some(&msg), None, None, false, user).await?;
                 track("loved", from).await;
             }
             Ok(Command::User_Settings) => {
-                user_settings_command(bot, msg.into(), None, None, false, "", user).await?;
+                user_settings_command(&bot, Some(&msg), None, None, false, "", user).await?;
                 track("user_settings", from).await;
             }
             Ok(Command::Collage { arg }) => {
-                collage_command(bot, msg.into(), None, None, false, &arg, user).await?;
+                collage_command(&bot, Some(&msg), None, None, false, &arg, user).await?;
                 track("collage", from).await;
             }
             Ok(Command::Topkek { arg }) => {
-                top_command(bot, msg.into(), None, None, false, &arg, user).await?;
+                top_command(&bot, Some(&msg), None, None, false, &arg, user).await?;
                 track("top", from).await;
             }
             Ok(Command::Compat { arg }) => {
-                compat_command(bot, msg, &arg, user).await?;
+                compat_command(&bot, &msg, &arg, user).await?;
                 track("compat", from).await;
             }
             Ok(Command::Unset) => {
-                unset_command(bot, msg, user).await?;
+                unset_command(&bot, &msg, user).await?;
                 track("unset", from).await;
             }
             Ok(Command::Random { arg }) => {
-                random_chooser_command(bot, msg.into(), None, None, false, &arg, user).await?;
+                random_chooser_command(&bot, Some(&msg), None, None, false, &arg, user).await?;
                 track("random", from).await;
             }
             Ok(Command::Flex) => {
-                flex_command(bot, msg.into(), None, None, false, user).await?;
+                flex_command(&bot, Some(&msg), None, None, false, user).await?;
                 track("flex", from).await;
             }
 
@@ -315,13 +312,13 @@ async fn message_handler(bot: Bot, msg: Message) -> Result<(), Box<dyn Error + S
 }
 
 async fn get_registered_user(
-    bot: Bot,
-    msg: Option<Message>,
+    bot: &Bot,
+    msg: Option<&Message>,
     inline_message_id: Option<String>,
     inline_from: Option<&teloxide::types::User>,
     edit: bool,
 ) -> Result<db::User, Box<dyn Error + Send + Sync>> {
-    let from = utils::choose_the_from(msg.as_ref(), inline_from);
+    let from = utils::choose_the_from(msg, inline_from);
 
     let user = DB.lock().unwrap().fetch_user(from.id.0);
     match user {
@@ -344,8 +341,8 @@ async fn get_registered_user(
 }
 
 async fn send_err_msg(
-    bot: Bot,
-    msg: Option<Message>,
+    bot: &Bot,
+    msg: Option<&Message>,
     inline_message_id: Option<String>,
     edit: bool,
     e: Box<dyn Error + Send + Sync>,
@@ -371,12 +368,12 @@ async fn my_chat_member_handler(
     chat_member_updated: ChatMemberUpdated,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     if chat_member_updated.new_chat_member.user.id == me.id {
-        start_command(bot, chat_member_updated.chat.id).await?;
+        start_command(&bot, chat_member_updated.chat.id).await?;
     }
     Ok(())
 }
 
-async fn start_command(bot: Bot, chat_id: ChatId) -> Result<(), Box<dyn Error + Send + Sync>> {
+async fn start_command(bot: &Bot, chat_id: ChatId) -> Result<(), Box<dyn Error + Send + Sync>> {
     bot.send_message(chat_id, consts::WELCOME_TEXT)
         .parse_mode(ParseMode::Html)
         .await?;
@@ -392,8 +389,8 @@ enum StatusType {
 }
 
 async fn status_command(
-    bot: Bot,
-    msg: Option<Message>,
+    bot: &Bot,
+    msg: Option<&Message>,
     inline_message_id: Option<String>,
     inline_from: Option<&teloxide::types::User>,
     edit: bool,
@@ -408,7 +405,7 @@ async fn status_command(
             .collect()
     });
 
-    let from = utils::choose_the_from(msg.as_ref(), inline_from);
+    let from = utils::choose_the_from(msg, inline_from);
 
     let limit = if status_type == StatusType::Expanded {
         4
@@ -597,14 +594,14 @@ async fn status_command(
 }
 
 async fn loved_command(
-    bot: Bot,
-    msg: Option<Message>,
+    bot: &Bot,
+    msg: Option<&Message>,
     inline_message_id: Option<String>,
     inline_from: Option<&teloxide::types::User>,
     edit: bool,
     user: User,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let from = utils::choose_the_from(msg.as_ref(), inline_from);
+    let from = utils::choose_the_from(msg, inline_from);
 
     let tracks =
         api_requester::fetch_loved_tracks(user.account_username.as_str(), &user.api_type()).await;
@@ -662,8 +659,8 @@ async fn loved_command(
 }
 
 async fn set_command(
-    bot: Bot,
-    msg: Message,
+    bot: &Bot,
+    msg: &Message,
     inline_from: Option<&teloxide::types::User>,
     arg: &str,
     edit: bool,
@@ -674,7 +671,7 @@ async fn set_command(
         return Ok(());
     }
 
-    let from = choose_the_from(Some(&msg), inline_from);
+    let from = choose_the_from(msg.into(), inline_from);
 
     let arg_splits = arg.splitn(2, ' ').collect::<Vec<_>>();
 
@@ -732,15 +729,15 @@ async fn set_command(
 }
 
 async fn user_settings_command(
-    bot: Bot,
-    msg: Option<Message>,
+    bot: &Bot,
+    msg: Option<&Message>,
     inline_message_id: Option<String>,
     inline_from: Option<&teloxide::types::User>,
     edit: bool,
     arg: &str,
     user: User,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let from = utils::choose_the_from(msg.as_ref(), inline_from);
+    let from = utils::choose_the_from(msg, inline_from);
     let mut user = user;
     match arg {
         "profile_show" => {
@@ -784,8 +781,8 @@ async fn user_settings_command(
 }
 
 async fn top_command(
-    bot: Bot,
-    msg: Option<Message>,
+    bot: &Bot,
+    msg: Option<&Message>,
     inline_message_id: Option<String>,
     inline_from: Option<&teloxide::types::User>,
     edit: bool,
@@ -793,7 +790,7 @@ async fn top_command(
     user: User,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let n = 5;
-    let from = utils::choose_the_from(msg.as_ref(), inline_from);
+    let from = utils::choose_the_from(msg, inline_from);
 
     if arg.is_empty() {
         utils::send_or_edit_message(bot, consts::TOP_CLICK, msg, None, false, None, true).await?;
@@ -897,15 +894,15 @@ async fn top_command(
     Ok(())
 }
 async fn collage_command(
-    bot: Bot,
-    msg: Option<Message>,
+    bot: &Bot,
+    msg: Option<&Message>,
     inline_message_id: Option<String>,
     inline_from: Option<&teloxide::types::User>,
     edit: bool,
     arg: &str,
     user: User,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let from = utils::choose_the_from(msg.as_ref(), inline_from);
+    let from = utils::choose_the_from(msg, inline_from);
 
     if arg.is_empty() {
         utils::send_or_edit_message(bot, consts::COLLAGE_CLICK, msg, None, false, None, true)
@@ -1014,8 +1011,8 @@ async fn collage_command(
 }
 
 async fn random_chooser_command(
-    bot: Bot,
-    msg: Option<Message>,
+    bot: &Bot,
+    msg: Option<&Message>,
     inline_message_id: Option<String>,
     inline_from: Option<&teloxide::types::User>,
     edit: bool,
@@ -1023,7 +1020,7 @@ async fn random_chooser_command(
     user: User,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     if arg.is_empty() {
-        let from = utils::choose_the_from(msg.as_ref(), inline_from);
+        let from = utils::choose_the_from(msg, inline_from);
         let user_id = from.id.0;
         let keyboard = InlineKeyboardMarkup::new(vec![vec![
             InlineKeyboardButton::callback("🎵 Track", format!("{} random track", user_id)),
@@ -1048,15 +1045,15 @@ async fn random_chooser_command(
 }
 
 async fn random_command(
-    bot: Bot,
-    msg: Option<Message>,
+    bot: &Bot,
+    msg: Option<&Message>,
     inline_message_id: Option<String>,
     inline_from: Option<&teloxide::types::User>,
     edit: bool,
     arg: &str,
     user: User,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let from = utils::choose_the_from(msg.as_ref(), inline_from);
+    let from = utils::choose_the_from(msg, inline_from);
 
     let username = user.account_username.to_owned();
     let api_type = user.api_type();
@@ -1167,14 +1164,14 @@ async fn random_command(
 }
 
 async fn flex_command(
-    bot: Bot,
-    msg: Option<Message>,
+    bot: &Bot,
+    msg: Option<&Message>,
     inline_message_id: Option<String>,
     inline_from: Option<&teloxide::types::User>,
     edit: bool,
     user: User,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let from = utils::choose_the_from(msg.as_ref(), inline_from);
+    let from = utils::choose_the_from(msg, inline_from);
 
     let scrobble_user =
         api_requester::fetch_user_info(&user.account_username, &user.api_type()).await?;
@@ -1217,15 +1214,15 @@ async fn flex_command(
 }
 
 async fn compat_command(
-    bot: Bot,
-    msg: Message,
+    bot: &Bot,
+    msg: &Message,
     arg: &str,
     db_user1_u: User,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let user1 = msg.from().unwrap();
+    let user1 = msg.from.as_ref().unwrap();
     let reply_to_msg = msg.reply_to_message();
 
-    if reply_to_msg.is_none() || reply_to_msg.unwrap().from().is_none() {
+    if reply_to_msg.is_none() || reply_to_msg.unwrap().from.as_ref().is_none() {
         utils::send_or_edit_message(
             bot,
             consts::COMPAT_CLICK,
@@ -1240,7 +1237,7 @@ async fn compat_command(
         return Ok(());
     }
 
-    let user2 = reply_to_msg.unwrap().from().unwrap();
+    let user2 = reply_to_msg.unwrap().from.as_ref().unwrap();
     let db_user2 = DB.lock().unwrap().fetch_user(user2.id.0);
 
     let text: String = if user1.id.0 == user2.id.0 {
@@ -1317,8 +1314,8 @@ async fn compat_command(
 }
 
 async fn unset_command(
-    bot: Bot,
-    msg: Message,
+    bot: &Bot,
+    msg: &Message,
     user: User,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     DB.lock().unwrap().delete_user(user.tg_user_id).unwrap();
@@ -1465,7 +1462,7 @@ async fn inline_result_handler(
     let arg = *splits.last().unwrap_or(&"");
     let from = Some(&chosen_inline_result.from);
     let user = get_registered_user(
-        bot.clone(),
+        &bot,
         None,
         chosen_inline_result.inline_message_id.clone(),
         from,
@@ -1481,7 +1478,7 @@ async fn inline_result_handler(
     match result_id {
         "status" => {
             status_command(
-                bot,
+                &bot,
                 None,
                 chosen_inline_result.inline_message_id,
                 from,
@@ -1495,7 +1492,7 @@ async fn inline_result_handler(
         }
         "status_full" => {
             status_command(
-                bot,
+                &bot,
                 None,
                 chosen_inline_result.inline_message_id,
                 from,
@@ -1509,7 +1506,7 @@ async fn inline_result_handler(
         }
         "loved" => {
             loved_command(
-                bot,
+                &bot,
                 None,
                 chosen_inline_result.inline_message_id,
                 from,
@@ -1521,7 +1518,7 @@ async fn inline_result_handler(
         }
         "collage" => {
             collage_command(
-                bot,
+                &bot,
                 None,
                 chosen_inline_result.inline_message_id,
                 from,
@@ -1534,7 +1531,7 @@ async fn inline_result_handler(
         }
         "random" => {
             random_chooser_command(
-                bot,
+                &bot,
                 None,
                 chosen_inline_result.inline_message_id,
                 from,
@@ -1547,7 +1544,7 @@ async fn inline_result_handler(
         }
         "flex" => {
             flex_command(
-                bot,
+                &bot,
                 None,
                 chosen_inline_result.inline_message_id,
                 from,
@@ -1622,178 +1619,189 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
     let from = &q.from;
 
     // message content and message date will not be available if the message is too old.
-    let message_date = q.message.as_ref().map(|m| m.date);
 
-    if message_date.is_none() || Utc::now() - message_date.unwrap() > Duration::hours(48) {
-        bot.answer_callback_query(q.id)
-            .text(consts::MESSAGE_TOO_OLD)
-            .await?;
-        return Ok(());
-    }
+    match q.message {
+        Some(MaybeInaccessibleMessage::Regular(message)) => {
+            // 0 means everyone is allowed to click
+            if allowed_user_id != 0 && allowed_user_id != from.id.0 {
+                bot.answer_callback_query(q.id).text(consts::NO).await?;
+                return Ok(());
+            };
 
-    // 0 means everyone is allowed to click
-    if allowed_user_id != 0 && allowed_user_id != from.id.0 {
-        bot.answer_callback_query(q.id).text(consts::NO).await?;
-        return Ok(());
-    };
-
-    if data == "set" {
-        set_command(bot, q.message.unwrap(), Some(from), &arg, true).await?;
-        return Ok(());
-    }
-
-    let user = DB.lock().unwrap().fetch_user(from.id.0);
-
-    if user.is_none() {
-        bot.answer_callback_query(q.id)
-            .text(consts::NOT_REGISTERED)
-            .show_alert(true)
-            .await?;
-        return Ok(());
-    }
-
-    let user = user.unwrap();
-
-    match data {
-        "status" => {
-            status_command(
-                bot,
-                q.message,
-                q.inline_message_id,
-                Some(from),
-                true,
-                arg.parse().unwrap_or(StatusType::Compact),
-                true,
-                user,
-            )
-            .await?;
-        }
-        "status_refresh" => {
-            let res = status_command(
-                bot.clone(),
-                q.message,
-                q.inline_message_id,
-                Some(from),
-                true,
-                arg.parse().unwrap_or(StatusType::Compact),
-                false,
-                user,
-            )
-            .await;
-            if res.is_err() {
-                bot.answer_callback_query(q.id)
-                    .text(consts::MESSAGE_UNMODIFIED)
-                    .await?;
+            if data == "set" {
+                set_command(&bot, &message, Some(from), &arg, true).await?;
+                return Ok(());
             }
-        }
-        "info" => {
-            if user.api_type() == ApiType::Lastfm && q.message.is_some() {
-                let msg = q.message.unwrap();
-                let msg_text = msg.text().unwrap_or_default().to_string();
-                let itatic_entity = utils::find_first_entity(&msg, MessageEntityKind::Italic);
-                let bold_entity = utils::find_first_entity(&msg, MessageEntityKind::Bold);
 
-                if itatic_entity.is_none() || bold_entity.is_none() {
-                    bot.answer_callback_query(q.id)
-                        .text(consts::NOT_FOUND)
-                        .await?;
-                    return Ok(());
-                }
+            let user = DB.lock().unwrap().fetch_user(from.id.0);
 
-                let ita = itatic_entity.unwrap();
-                let bol = bold_entity.unwrap();
-
-                let artist =
-                    utils::slice_tg_string(msg_text.clone(), ita.offset, ita.length + ita.offset);
-                let title = utils::slice_tg_string(msg_text, bol.offset, bol.length + bol.offset);
-
-                if artist.is_none() || title.is_none() {
-                    bot.answer_callback_query(q.id)
-                        .text(consts::NOT_FOUND)
-                        .await?;
-                    return Ok(());
-                }
-
-                let lastfm_username = user.account_username;
-
-                let infos = fetch_lastfm_infos(lastfm_username, artist.unwrap(), title.unwrap())
-                    .await
-                    .unwrap_or(consts::NOT_FOUND.to_owned());
+            if user.is_none() {
                 bot.answer_callback_query(q.id)
-                    .text(infos)
+                    .text(consts::NOT_REGISTERED)
                     .show_alert(true)
                     .await?;
-            } else {
-                bot.answer_callback_query(q.id).text(consts::NO).await?;
+                return Ok(());
+            }
+
+            let user = user.unwrap();
+
+            match data {
+                "status" => {
+                    status_command(
+                        &bot,
+                        Some(&message),
+                        q.inline_message_id,
+                        Some(from),
+                        true,
+                        arg.parse().unwrap_or(StatusType::Compact),
+                        true,
+                        user,
+                    )
+                    .await?;
+                }
+                "status_refresh" => {
+                    let res = status_command(
+                        &bot,
+                        Some(&message),
+                        q.inline_message_id,
+                        Some(from),
+                        true,
+                        arg.parse().unwrap_or(StatusType::Compact),
+                        false,
+                        user,
+                    )
+                    .await;
+                    if res.is_err() {
+                        bot.answer_callback_query(q.id)
+                            .text(consts::MESSAGE_UNMODIFIED)
+                            .await?;
+                    }
+                }
+                "info" => {
+                    if user.api_type() == ApiType::Lastfm {
+                        let msg_text = message.text().unwrap_or_default().to_string();
+                        let itatic_entity =
+                            utils::find_first_entity(&message, MessageEntityKind::Italic);
+                        let bold_entity =
+                            utils::find_first_entity(&message, MessageEntityKind::Bold);
+
+                        if itatic_entity.is_none() || bold_entity.is_none() {
+                            bot.answer_callback_query(q.id)
+                                .text(consts::NOT_FOUND)
+                                .await?;
+                            return Ok(());
+                        }
+
+                        let ita = itatic_entity.unwrap();
+                        let bol = bold_entity.unwrap();
+
+                        let artist = utils::slice_tg_string(
+                            msg_text.clone(),
+                            ita.offset,
+                            ita.length + ita.offset,
+                        );
+                        let title =
+                            utils::slice_tg_string(msg_text, bol.offset, bol.length + bol.offset);
+
+                        if artist.is_none() || title.is_none() {
+                            bot.answer_callback_query(q.id)
+                                .text(consts::NOT_FOUND)
+                                .await?;
+                            return Ok(());
+                        }
+
+                        let lastfm_username = user.account_username;
+
+                        let infos =
+                            fetch_lastfm_infos(lastfm_username, artist.unwrap(), title.unwrap())
+                                .await
+                                .unwrap_or(consts::NOT_FOUND.to_owned());
+                        bot.answer_callback_query(q.id)
+                            .text(infos)
+                            .show_alert(true)
+                            .await?;
+                    } else {
+                        bot.answer_callback_query(q.id).text(consts::NO).await?;
+                    }
+                }
+
+                "collage" => {
+                    let keyboard =
+                        InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
+                            "🖼️",
+                            "0 loading",
+                        )]]);
+                    let media =
+                        InputMediaPhoto::new(InputFile::url(Url::parse(consts::URL_3X3).unwrap()))
+                            .caption(consts::LOADING);
+
+                    utils::send_or_edit_photo(
+                        &bot,
+                        media,
+                        Some(&message),
+                        q.inline_message_id.as_ref(),
+                        true,
+                        Some(keyboard),
+                        false,
+                    )
+                    .await?;
+
+                    collage_command(
+                        &bot,
+                        Some(&message),
+                        q.inline_message_id,
+                        from.into(),
+                        true,
+                        &arg,
+                        user,
+                    )
+                    .await?;
+                }
+
+                "random" => {
+                    random_command(
+                        &bot,
+                        Some(&message),
+                        q.inline_message_id,
+                        from.into(),
+                        true,
+                        &arg,
+                        user,
+                    )
+                    .await?;
+                }
+
+                "user_settings" => {
+                    user_settings_command(
+                        &bot,
+                        Some(&message),
+                        q.inline_message_id,
+                        from.into(),
+                        true,
+                        &arg,
+                        user,
+                    )
+                    .await?;
+                }
+
+                "loading" => {
+                    bot.answer_callback_query(q.id)
+                        .text(consts::LOADING)
+                        .await?;
+                }
+
+                _ => {
+                    bot.answer_callback_query(q.id).text(consts::NO).await?;
+                    log::error!("{data} unhandled");
+                }
             }
         }
 
-        "collage" => {
-            let keyboard = InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
-                "🖼️",
-                "0 loading",
-            )]]);
-            let media = InputMediaPhoto::new(InputFile::url(Url::parse(consts::URL_3X3).unwrap()))
-                .caption(consts::LOADING);
-
-            utils::send_or_edit_photo(
-                bot.clone(),
-                media,
-                q.message.clone(),
-                q.inline_message_id.as_ref(),
-                true,
-                Some(keyboard),
-                false,
-            )
-            .await?;
-
-            collage_command(
-                bot,
-                q.message,
-                q.inline_message_id,
-                from.into(),
-                true,
-                &arg,
-                user,
-            )
-            .await?;
-        }
-
-        "random" => {
-            random_command(
-                bot,
-                q.message,
-                q.inline_message_id,
-                from.into(),
-                true,
-                &arg,
-                user,
-            )
-            .await?;
-        }
-
-        "user_settings" => {
-            user_settings_command(
-                bot,
-                q.message,
-                q.inline_message_id,
-                from.into(),
-                true,
-                &arg,
-                user,
-            )
-            .await?;
-        }
-
-        "loading" => {
+        Some(MaybeInaccessibleMessage::Inaccessible(_)) | None => {
             bot.answer_callback_query(q.id)
-                .text(consts::LOADING)
+                .text(consts::MESSAGE_TOO_OLD)
                 .await?;
-        }
-
-        _ => {
-            bot.answer_callback_query(q.id).text(consts::NO).await?;
-            log::error!("{data} unhandled");
+            return Ok(());
         }
     }
 
