@@ -21,10 +21,9 @@ use teloxide::{
     prelude::*,
     types::{
         BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResult,
-        InlineQueryResultArticle, InlineQueryResultPhoto, InlineQueryResultsButton,
-        InlineQueryResultsButtonKind, InputFile, InputMediaPhoto, InputMessageContent,
-        InputMessageContentText, MaybeInaccessibleMessage, Me, MessageEntityKind, ParseMode,
-        ReplyParameters,
+        InlineQueryResultArticle, InlineQueryResultsButton, InlineQueryResultsButtonKind,
+        InputFile, InputMediaPhoto, InputMessageContent, InputMessageContentText, Me,
+        MessageEntityKind, ParseMode, ReplyParameters,
     },
     utils::command::BotCommands,
 };
@@ -103,7 +102,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         messages_per_sec_chat: 1,
         messages_per_sec_overall: 30,
         messages_per_min_chat: 10,
-        messages_per_min_channel_or_supergroup: 10,
+        messages_per_min_channel_or_supergroup: 20,
     });
 
     let handler = dptree::entry()
@@ -1358,45 +1357,45 @@ async fn inline_query_handler(
     )
     .reply_markup(keyboard.clone());
 
-    let collage1w = InlineQueryResultPhoto::new(
+    let collage1w = InlineQueryResultArticle::new(
         "collage 3 1w",
-        Url::parse(consts::URL_3X3_ALBUM_1W)?,
-        Url::parse(consts::URL_3X3_ALBUM_1W)?,
+        "3x3 1 week collage",
+        InputMessageContent::Text(InputMessageContentText::new("3x3 1 week collage")),
     )
     .reply_markup(keyboard.clone());
 
-    let collage1m = InlineQueryResultPhoto::new(
+    let collage1m = InlineQueryResultArticle::new(
         "collage 3 1m",
-        Url::parse(consts::URL_3X3_ALBUM_1M)?,
-        Url::parse(consts::URL_3X3_ALBUM_1M)?,
+        "3x3 1 month collage",
+        InputMessageContent::Text(InputMessageContentText::new("3x3 1 month collage")),
     )
     .reply_markup(keyboard.clone());
 
-    let collage3m = InlineQueryResultPhoto::new(
+    let collage3m = InlineQueryResultArticle::new(
         "collage 3 3m",
-        Url::parse(consts::URL_3X3_ALBUM_3M)?,
-        Url::parse(consts::URL_3X3_ALBUM_3M)?,
+        "3x3 3 months collage",
+        InputMessageContent::Text(InputMessageContentText::new("3x3 3 months collage")),
     )
     .reply_markup(keyboard.clone());
 
-    let collage6m = InlineQueryResultPhoto::new(
+    let collage6m = InlineQueryResultArticle::new(
         "collage 3 6m",
-        Url::parse(consts::URL_3X3_ALBUM_6M)?,
-        Url::parse(consts::URL_3X3_ALBUM_6M)?,
+        "3x3 6 months collage",
+        InputMessageContent::Text(InputMessageContentText::new("3x3 6 months collage")),
     )
     .reply_markup(keyboard.clone());
 
-    let collage1y = InlineQueryResultPhoto::new(
+    let collage1y = InlineQueryResultArticle::new(
         "collage 3 1y",
-        Url::parse(consts::URL_3X3_ALBUM_1Y)?,
-        Url::parse(consts::URL_3X3_ALBUM_1Y)?,
+        "3x3 1 year collage",
+        InputMessageContent::Text(InputMessageContentText::new("3x3 1 year collage")),
     )
     .reply_markup(keyboard.clone());
 
-    let collage_overall = InlineQueryResultPhoto::new(
+    let collage_overall = InlineQueryResultArticle::new(
         "collage 3 overall",
-        Url::parse(consts::URL_3X3_ALBUM_OVERALL)?,
-        Url::parse(consts::URL_3X3_ALBUM_OVERALL)?,
+        "3x3 all time collage",
+        InputMessageContent::Text(InputMessageContentText::new("3x3 all time collage")),
     )
     .reply_markup(keyboard.clone());
 
@@ -1420,12 +1419,12 @@ async fn inline_query_handler(
         InlineQueryResult::Article(loved),
         InlineQueryResult::Article(flex),
         InlineQueryResult::Article(random),
-        InlineQueryResult::Photo(collage1w),
-        InlineQueryResult::Photo(collage1m),
-        InlineQueryResult::Photo(collage3m),
-        InlineQueryResult::Photo(collage6m),
-        InlineQueryResult::Photo(collage1y),
-        InlineQueryResult::Photo(collage_overall),
+        InlineQueryResult::Article(collage1w),
+        InlineQueryResult::Article(collage1m),
+        InlineQueryResult::Article(collage3m),
+        InlineQueryResult::Article(collage6m),
+        InlineQueryResult::Article(collage1y),
+        InlineQueryResult::Article(collage_overall),
     ];
 
     if user.is_none() {
@@ -1594,13 +1593,17 @@ async fn fetch_lastfm_infos(
             format!(
                 "🎵 {} ({}):\n{} plays\n{} 🌎 listeners\n{} 🌎 scrobbles",
                 e.name,
-                utils::human_readable_duration(e.duration),
+                if e.duration > 0 {
+                    utils::human_readable_duration(e.duration)
+                } else {
+                    "??:??".to_string()
+                },
                 e.user_playcount.to_formatted_string(&Locale::en),
                 e.listeners.to_formatted_string(&Locale::en),
                 e.playcount.to_formatted_string(&Locale::en)
             )
         })
-        .unwrap_or_default();
+        .unwrap_or_else(|_| "Failed to fetch track info".to_string());
 
     let text = format!("{track}\n\n{artist}");
 
@@ -1608,7 +1611,7 @@ async fn fetch_lastfm_infos(
 }
 
 async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let callback_data = q.data.unwrap();
+    let callback_data = q.data.as_ref().unwrap();
     let splits: Vec<&str> = callback_data.splitn(3, ' ').collect();
     let allowed_user_id: u64 = splits[0].parse()?;
     let data = splits[1];
@@ -1618,73 +1621,92 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
         "".to_owned()
     };
     let from = &q.from;
+    let regular_message = &q.regular_message();
+    let inline_message_id = q.inline_message_id.clone();
+    let is_old = q.inline_message_id.is_none() && regular_message.is_none();
 
     // message content and message date will not be available if the message is too old.
+    if is_old {
+        bot.answer_callback_query(q.id)
+            .text(consts::MESSAGE_TOO_OLD)
+            .await?;
+        return Ok(());
+    }
 
-    match q.message {
-        Some(MaybeInaccessibleMessage::Regular(message)) => {
-            // 0 means everyone is allowed to click
-            if allowed_user_id != 0 && allowed_user_id != from.id.0 {
-                bot.answer_callback_query(q.id).text(consts::NO).await?;
-                return Ok(());
-            };
+    // 0 means everyone is allowed to click
+    if allowed_user_id != 0 && allowed_user_id != from.id.0 {
+        bot.answer_callback_query(q.id).text(consts::NO).await?;
+        return Ok(());
+    };
 
-            if data == "set" {
-                set_command(&bot, &message, Some(from), &arg, true).await?;
-                return Ok(());
-            }
+    if data == "set" && regular_message.is_some() {
+        set_command(&bot, regular_message.unwrap(), Some(from), &arg, true).await?;
+        return Ok(());
+    }
 
-            let user = DB.lock().unwrap().fetch_user(from.id.0);
+    let user = DB.lock().unwrap().fetch_user(from.id.0);
 
-            if user.is_none() {
+    if user.is_none() {
+        bot.answer_callback_query(q.id)
+            .text(consts::NOT_REGISTERED)
+            .show_alert(true)
+            .await?;
+        return Ok(());
+    }
+
+    let user = user.unwrap();
+
+    match data {
+        "status" => {
+            status_command(
+                &bot,
+                *regular_message,
+                inline_message_id,
+                Some(from),
+                true,
+                arg.parse().unwrap_or(StatusType::Compact),
+                true,
+                user,
+            )
+            .await?;
+        }
+        "status_refresh" => {
+            let res = status_command(
+                &bot,
+                *regular_message,
+                inline_message_id,
+                Some(from),
+                true,
+                arg.parse().unwrap_or(StatusType::Compact),
+                false,
+                user,
+            )
+            .await;
+            if res.is_err() {
                 bot.answer_callback_query(q.id)
-                    .text(consts::NOT_REGISTERED)
-                    .show_alert(true)
+                    .text(consts::MESSAGE_UNMODIFIED)
                     .await?;
-                return Ok(());
             }
+        }
+        "info" => {
+            // regular_message must not be None here
 
-            let user = user.unwrap();
+            match regular_message {
+                None => {
+                    bot.answer_callback_query(q.id)
+                        .text(consts::NO)
+                        .show_alert(true)
+                        .await?;
+                    return Ok(());
+                }
 
-            match data {
-                "status" => {
-                    status_command(
-                        &bot,
-                        Some(&message),
-                        q.inline_message_id,
-                        Some(from),
-                        true,
-                        arg.parse().unwrap_or(StatusType::Compact),
-                        true,
-                        user,
-                    )
-                    .await?;
-                }
-                "status_refresh" => {
-                    let res = status_command(
-                        &bot,
-                        Some(&message),
-                        q.inline_message_id,
-                        Some(from),
-                        true,
-                        arg.parse().unwrap_or(StatusType::Compact),
-                        false,
-                        user,
-                    )
-                    .await;
-                    if res.is_err() {
-                        bot.answer_callback_query(q.id)
-                            .text(consts::MESSAGE_UNMODIFIED)
-                            .await?;
-                    }
-                }
-                "info" => {
+                Some(regular_message) => {
                     if user.api_type() == ApiType::Lastfm {
-                        let msg_text = message.text().unwrap_or_default().to_string();
+                        let msg_text = regular_message.text().unwrap_or_default().to_string();
                         let itatic_entity =
-                            utils::find_first_entity(&message, MessageEntityKind::Italic);
+                            utils::find_first_entity(regular_message, MessageEntityKind::Italic);
                         let bold_entity =
-                            utils::find_first_entity(&message, MessageEntityKind::Bold);
+                            utils::find_first_entity(regular_message, MessageEntityKind::Bold);
 
                         if itatic_entity.is_none() || bold_entity.is_none() {
                             bot.answer_callback_query(q.id)
@@ -1725,84 +1747,65 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
                         bot.answer_callback_query(q.id).text(consts::NO).await?;
                     }
                 }
-
-                "collage" => {
-                    let keyboard =
-                        InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
-                            "🖼️",
-                            "0 loading",
-                        )]]);
-                    let media =
-                        InputMediaPhoto::new(InputFile::url(Url::parse(consts::URL_3X3).unwrap()))
-                            .caption(consts::LOADING);
-
-                    utils::send_or_edit_photo(
-                        &bot,
-                        media,
-                        Some(&message),
-                        q.inline_message_id.as_ref(),
-                        true,
-                        Some(keyboard),
-                        false,
-                    )
-                    .await?;
-
-                    collage_command(
-                        &bot,
-                        Some(&message),
-                        q.inline_message_id,
-                        from.into(),
-                        true,
-                        &arg,
-                        user,
-                    )
-                    .await?;
-                }
-
-                "random" => {
-                    random_command(
-                        &bot,
-                        Some(&message),
-                        q.inline_message_id,
-                        from.into(),
-                        true,
-                        &arg,
-                        user,
-                    )
-                    .await?;
-                }
-
-                "user_settings" => {
-                    user_settings_command(
-                        &bot,
-                        Some(&message),
-                        q.inline_message_id,
-                        from.into(),
-                        true,
-                        &arg,
-                        user,
-                    )
-                    .await?;
-                }
-
-                "loading" => {
-                    bot.answer_callback_query(q.id)
-                        .text(consts::LOADING)
-                        .await?;
-                }
-
-                _ => {
-                    bot.answer_callback_query(q.id).text(consts::NO).await?;
-                    log::error!("{data} unhandled");
-                }
             }
         }
 
-        Some(MaybeInaccessibleMessage::Inaccessible(_)) | None => {
-            bot.answer_callback_query(q.id)
-                .text(consts::MESSAGE_TOO_OLD)
+        "collage" => {
+            let keyboard = InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
+                "🖼️",
+                "0 loading",
+            )]]);
+
+            utils::edit_markup(&bot, *regular_message, inline_message_id.as_ref(), keyboard)
                 .await?;
-            return Ok(());
+
+            collage_command(
+                &bot,
+                *regular_message,
+                inline_message_id,
+                from.into(),
+                true,
+                &arg,
+                user,
+            )
+            .await?;
+        }
+
+        "random" => {
+            random_command(
+                &bot,
+                *regular_message,
+                inline_message_id,
+                from.into(),
+                true,
+                &arg,
+                user,
+            )
+            .await?;
+        }
+
+        "user_settings" => {
+            user_settings_command(
+                &bot,
+                *regular_message,
+                inline_message_id,
+                from.into(),
+                true,
+                &arg,
+                user,
+            )
+            .await?;
+        }
+
+        "loading" => {
+            bot.answer_callback_query(q.id)
+                .text(consts::LOADING)
+                .await?;
+        }
+
+        _ => {
+            bot.answer_callback_query(q.id).text(consts::NO).await?;
+            log::error!("{data} unhandled");
         }
     }
 

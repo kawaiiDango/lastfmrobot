@@ -8,8 +8,9 @@ use chrono::{DateTime, Utc};
 use teloxide::{
     adaptors::Throttle,
     payloads::{
-        EditMessageMediaInlineSetters, EditMessageMediaSetters, EditMessageTextInlineSetters,
-        EditMessageTextSetters, SendMessageSetters, SendPhotoSetters,
+        EditMessageMediaInlineSetters, EditMessageMediaSetters,
+        EditMessageReplyMarkupInlineSetters, EditMessageReplyMarkupSetters,
+        EditMessageTextInlineSetters, EditMessageTextSetters, SendMessageSetters, SendPhotoSetters,
     },
     requests::Requester,
     types::{
@@ -241,6 +242,27 @@ pub async fn send_or_edit_photo(
             x = x.reply_markup(keyboard.unwrap())
         }
         x.await?;
+    }
+
+    Ok(())
+}
+
+pub async fn edit_markup(
+    bot: &Throttle<teloxide::Bot>,
+    msg: Option<&Message>,
+    inline_message_id: Option<&String>,
+    keyboard: InlineKeyboardMarkup,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    if msg.is_some() {
+        let m = &msg.unwrap();
+
+        bot.edit_message_reply_markup(m.chat.id, m.id)
+            .reply_markup(keyboard)
+            .await?;
+    } else if inline_message_id.is_some() {
+        bot.edit_message_reply_markup_inline(inline_message_id.unwrap())
+            .reply_markup(keyboard)
+            .await?;
     }
 
     Ok(())
