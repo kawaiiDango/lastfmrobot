@@ -12,11 +12,11 @@ use std::{
 use api_requester::{ApiType, TimePeriod};
 use db::{Db, User};
 use num_format::{Locale, ToFormattedString};
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use reqwest::Url;
 use strum_macros::{Display, EnumString, IntoStaticStr};
 use teloxide::{
-    adaptors::{throttle::Limits, Throttle},
+    adaptors::{Throttle, throttle::Limits},
     payloads::SendMessageSetters,
     prelude::*,
     types::{
@@ -103,7 +103,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         messages_per_sec_chat: 1,
         messages_per_sec_overall: 30,
         messages_per_min_chat: 10,
-        messages_per_min_channel: 10,
+        messages_per_min_channel_or_supergroup: 10,
     });
 
     let handler = dptree::entry()
@@ -388,6 +388,7 @@ enum StatusType {
     Expanded,
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn status_command(
     bot: &Bot,
     msg: Option<&Message>,
@@ -1074,7 +1075,7 @@ async fn random_command(
                 limit.into(),
             )
             .await?;
-            text = arr.choose(&mut rand::thread_rng()).map(|x| {
+            text = arr.choose(&mut rand::rng()).map(|x| {
                 search_text = x.name.clone().into();
                 format!(
                     "{}\n({} plays)",
@@ -1091,7 +1092,7 @@ async fn random_command(
                 limit.into(),
             )
             .await?;
-            text = arr.choose(&mut rand::thread_rng()).map(|x| {
+            text = arr.choose(&mut rand::rng()).map(|x| {
                 search_text = (x.artist.clone() + " " + &x.name.clone()).into();
                 format!(
                     "{} — {}\n({} plays)",
@@ -1109,7 +1110,7 @@ async fn random_command(
                 limit.into(),
             )
             .await?;
-            text = arr.choose(&mut rand::thread_rng()).map(|x| {
+            text = arr.choose(&mut rand::rng()).map(|x| {
                 search_text = (x.artist.clone() + " " + &x.name.clone()).into();
                 format!(
                     "{} — {}\n({} plays)",

@@ -13,7 +13,7 @@ pub const PRIVATE_PROFILE: &str = "Your scrobbles are hidden. To use the bot, di
 pub const NO_SCROBBLES: &str = "No scrwobbles fownd!";
 pub const UNSET: &str = "Your username has been unlinked fromt the bot.";
 pub const NO: &str = "Nuuuuuuuuuu!";
-pub const THEY_NOT_REGISTERED: &str = "They needs to /set their username with me.";
+pub const THEY_NOT_REGISTERED: &str = "They need to /set their username with me.";
 pub const COMPAT_CLICK: &str =
     "Usage: compat 1y. Reply to someone's message in a group, with this command.";
 pub const COLLAGE_CLICK: &str = "usage: <b>collage 5 1m for a 5x5</b> album art collage for the last one month.\n<b>/collage clean 4 alltime</b> for a 4x4 overall collage without text, etc.";

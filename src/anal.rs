@@ -82,11 +82,6 @@ pub async fn send() -> Result<(), reqwest_middleware::Error> {
     Ok(())
 }
 
-/// Sends an event to the amplitude servers
-// pub async fn send_one(event: Event) -> Result<(), reqwest::Error> {
-//     send(vec![event]).await
-// }
-
 async fn _send(upload_body: &UploadBody) -> Result<(), reqwest_middleware::Error> {
     let response = CLIENT_NOCACHE
         .post(URL_BATCH)

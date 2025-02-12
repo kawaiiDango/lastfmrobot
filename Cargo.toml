@@ -1,7 +1,7 @@
 [package]
 name = "lastfmrobot"
 version = "0.2.0"
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -12,24 +12,24 @@ pretty_env_logger = "0.5"
 tokio = { version =  "1.40", features = ["full"] }
 reqwest = { version = "0.12", features = ["json"] }
 serde_json = "1.0"
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.33", features = ["bundled"] }
 image = "0.25"
 imageproc = "0.25"
 ab_glyph = "0.2"
 url-escape = "0.1"
-http = "1.1"
-http-cache-reqwest = { version = "0.14", features = ["manager-moka"] }
-reqwest-middleware = {version = "0.3", features = ["json"] }
+http = "1.2"
+http-cache-reqwest = { version = "0.15", features = ["manager-moka"] }
+reqwest-middleware = {version = "0.4", features = ["json"] }
 num-format = "0.4"
-bytes = "1.7"
+bytes = "1.10"
 serde = "1.0"
-serde_with = "3.10"
+serde_with = "3.12"
 timeago = "0.4"
-rand = "0.8"
+rand = "0.9"
 async-trait = "0.1"
 task-local-extensions = "0.1"
 anyhow = "1.0"
 moka = { version = "0.12", features = ["future"] }
-strum = "0.26"
-strum_macros = "0.26"
+strum = "0.27"
+strum_macros = "0.27"
 chrono = "0.4"
