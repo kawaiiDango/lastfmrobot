@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection, Result};
+use rusqlite::{Connection, Result, params};
 
 use crate::api_requester::ApiType;
 
@@ -8,6 +8,7 @@ pub struct User {
     pub account_username: String,
     api_type: String,
     pub profile_shown: bool,
+    pub cover_shown: bool,
 }
 
 impl User {
@@ -16,12 +17,14 @@ impl User {
         account_username: String,
         api_type: &ApiType,
         profile_shown: bool,
+        cover_shown: bool,
     ) -> User {
         User {
             tg_user_id,
             account_username,
             api_type: api_type.to_string(),
             profile_shown,
+            cover_shown,
         }
     }
 
@@ -42,7 +45,8 @@ impl Db {
             tg_user_id              INTEGER PRIMARY KEY,
             account_username        TEXT NOT NULL,
             api_type                TEXT NOT NULL,
-            profile_shown           INTEGER NOT NULL DEFAULT 0
+            profile_shown           INTEGER NOT NULL DEFAULT 0,
+            cover_shown             INTEGER NOT NULL DEFAULT 0
             )",
             (),
         );
@@ -55,25 +59,24 @@ impl Db {
             .conn
             .prepare("SELECT * FROM users WHERE tg_user_id = ?1 LIMIT 1")
             .unwrap();
-        let user = stmt
-            .query_map([tg_user_id], |row| {
-                Ok(User {
-                    tg_user_id: row.get(0)?,
-                    account_username: row.get(1)?,
-                    api_type: row.get(2)?,
-                    profile_shown: row.get(3)?,
-                })
-            })
-            .unwrap()
-            .next()
-            .map(|x| x.unwrap());
 
-        user
+        stmt.query_map([tg_user_id], |row| {
+            Ok(User {
+                tg_user_id: row.get(0)?,
+                account_username: row.get(1)?,
+                api_type: row.get(2)?,
+                profile_shown: row.get(3)?,
+                cover_shown: row.get(4)?,
+            })
+        })
+        .unwrap()
+        .next()
+        .map(|x| x.unwrap())
     }
 
     pub fn upsert_user(&self, user: &User) -> Result<usize> {
-        self.conn.execute("INSERT INTO users (tg_user_id, account_username, api_type, profile_shown) VALUES (?1, ?2, ?3, ?4) ON CONFLICT (tg_user_id) DO UPDATE SET account_username = ?2, api_type = ?3, profile_shown = ?4",
-         params![user.tg_user_id, user.account_username, user.api_type, user.profile_shown])
+        self.conn.execute("INSERT INTO users (tg_user_id, account_username, api_type, profile_shown, cover_shown) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (tg_user_id) DO UPDATE SET account_username = ?2, api_type = ?3, profile_shown = ?4, cover_shown = ?5",
+         params![user.tg_user_id, user.account_username, user.api_type, user.profile_shown, user.cover_shown])
     }
 
     pub fn delete_user(&self, tg_user_id: u64) -> Result<usize> {

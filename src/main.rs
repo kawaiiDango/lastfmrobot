@@ -80,9 +80,7 @@ enum Command {
     Set {
         arg: String,
     },
-    #[command(description = "Unlink yourself from this bot")]
-    Unset,
-    #[command(description = "Show/hide your profile link")]
+    #[command(description = "Your pwefewences for this bot")]
     #[allow(non_camel_case_types)]
     User_Settings,
     #[command(description = "Weeeeelp!")]
@@ -288,10 +286,6 @@ async fn message_handler(bot: Bot, msg: Message) -> Result<(), Box<dyn Error + S
                 compat_command(&bot, &msg, &arg, user).await?;
                 track("compat", from).await;
             }
-            Ok(Command::Unset) => {
-                unset_command(&bot, &msg, user).await?;
-                track("unset", from).await;
-            }
             Ok(Command::Random { arg }) => {
                 random_chooser_command(&bot, Some(&msg), None, None, false, &arg, user).await?;
                 track("random", from).await;
@@ -394,7 +388,7 @@ async fn status_command(
     inline_message_id: Option<String>,
     inline_from: Option<&teloxide::types::User>,
     edit: bool,
-    status_type: StatusType,
+    status_type_param: StatusType,
     prefer_cached: bool,
     user: User,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -406,6 +400,18 @@ async fn status_command(
     });
 
     let from = utils::choose_the_from(msg, inline_from);
+
+    let status_type = if status_type_param == StatusType::Compact && user.cover_shown {
+        StatusType::CompactWithCover
+    } else {
+        status_type_param
+    };
+
+    let msg_is_photo = msg
+        .as_ref()
+        .and_then(|m| m.photo())
+        .map(|_| true)
+        .unwrap_or(false);
 
     let limit = if status_type == StatusType::Expanded {
         4
@@ -430,20 +436,13 @@ async fn status_command(
                 return Ok(());
             }
 
-            let album_art = if tracks[0].album_art_url.is_some() {
-                format!(
-                    "<a href=\"{}\">\u{200B}</a>\u{200B}",
-                    tracks[0].album_art_url.as_ref().unwrap()
-                )
-            } else {
-                "".to_string()
-            };
+            let album_art_url = tracks[0].album_art_url.as_ref();
 
             let mut user_playcount = 0;
             let mut tags_text: String = "".to_string();
             if user.api_type() == ApiType::Lastfm {
                 let track_info = api_requester::fetch_lastfm_track(
-                    user.account_username.clone(),
+                    user.account_username.clone().into(),
                     tracks[0].artist.clone(),
                     tracks[0].name.clone(),
                 )
@@ -519,8 +518,7 @@ async fn status_command(
                 .join("\n");
 
             let text = format!(
-                "{}{} {} listening to\n{}{}",
-                album_art,
+                "{} {} listening to\n{}{}",
                 utils::name_with_link(&from, &user),
                 if tracks[0].now_playing {
                     "is now"
@@ -537,7 +535,7 @@ async fn status_command(
                 StatusType::Expanded => {
                     keyboard[0].push(InlineKeyboardButton::callback(
                         "➖",
-                        format!("{} status {}", from.id.0, StatusType::Compact),
+                        format!("{} status {}", from.id.0, StatusType::CompactWithCover),
                     ));
                 }
                 StatusType::Compact => {
@@ -553,10 +551,10 @@ async fn status_command(
                     ));
                 }
                 StatusType::CompactWithCover => {
-                    keyboard[0].push(InlineKeyboardButton::callback(
-                        "➖",
-                        format!("{} status {}", from.id.0, StatusType::Compact),
-                    ));
+                    // keyboard[0].push(InlineKeyboardButton::callback(
+                    //     "➖",
+                    //     format!("{} status {}", from.id.0, StatusType::Compact),
+                    // ));
                     keyboard[0].push(InlineKeyboardButton::callback(
                         "➕",
                         format!("{} status {}", from.id.0, StatusType::Expanded),
@@ -573,16 +571,37 @@ async fn status_command(
                 format!("{} status_refresh {}", from.id.0, status_type),
             ));
 
-            utils::send_or_edit_message(
-                bot,
-                &text,
-                msg,
-                inline_message_id,
-                edit,
-                Some(InlineKeyboardMarkup::new(keyboard)),
-                status_type == StatusType::Compact,
-            )
-            .await?;
+            if ((status_type == StatusType::CompactWithCover
+                || status_type == StatusType::Expanded)
+                && album_art_url.is_some())
+                || msg_is_photo
+            {
+                utils::send_or_edit_photo(
+                    bot,
+                    InputMediaPhoto::new(InputFile::url(Url::parse(
+                        album_art_url.map_or(consts::LASTFM_STAR_URL, |v| v),
+                    )?))
+                    .caption(text)
+                    .show_caption_above_media(true),
+                    msg,
+                    inline_message_id.as_ref(),
+                    edit,
+                    Some(InlineKeyboardMarkup::new(keyboard)),
+                    false,
+                )
+                .await?;
+            } else {
+                utils::send_or_edit_message(
+                    bot,
+                    &text,
+                    msg,
+                    inline_message_id,
+                    edit,
+                    Some(InlineKeyboardMarkup::new(keyboard)),
+                    true,
+                )
+                .await?;
+            }
         }
 
         Err(e) => {
@@ -696,11 +715,11 @@ async fn set_command(
 
     let text = match recent_tracks {
         Ok(_) => {
-            let new_user = db::User::new(from.id.0, username.to_owned(), &api_type, false);
+            let new_user = db::User::new(from.id.0, username.to_owned(), &api_type, false, false);
 
             DB.lock().unwrap().upsert_user(&new_user)?;
             format!(
-                "✅Username set for {0}!\n\nUse /user_settings to show/hide links to your {0} profile.\n\nNot {0}? Change your account type using the buttons.",
+                "✅Username set for {0}!\n\nUse /user_settings to show links to your {0} profile, or always show album art for status if available.\n\nNot {0}? Change your account type using the buttons.",
                 api_type
             )
         }
@@ -748,22 +767,62 @@ async fn user_settings_command(
             user.profile_shown = false;
             DB.lock().unwrap().upsert_user(&user)?;
         }
+        "cover_show" => {
+            user.cover_shown = true;
+            DB.lock().unwrap().upsert_user(&user)?;
+        }
+        "cover_hide" => {
+            user.cover_shown = false;
+            DB.lock().unwrap().upsert_user(&user)?;
+        }
+        "unset" => {
+            DB.lock().unwrap().delete_user(user.tg_user_id).unwrap();
+            utils::send_or_edit_message(bot, consts::UNSET, msg, None, true, None, true).await?;
+            return Ok(());
+        }
         _ => {}
     }
 
-    let mut buttons = vec![vec![]];
+    let mut buttons = vec![];
 
-    if !user.profile_shown {
-        buttons[0].push(InlineKeyboardButton::callback(
-            format!("Show {} profile links", user.api_type()),
-            format!("{} user_settings profile_show", from.id,),
-        ));
-    } else {
-        buttons[0].push(InlineKeyboardButton::callback(
-            format!("Hide {} profile links", user.api_type()),
-            format!("{} user_settings profile_hide", from.id,),
-        ));
-    }
+    buttons.push(InlineKeyboardButton::callback(
+        format!(
+            "{} Profile links",
+            if user.profile_shown { "✅" } else { "⬜" }
+        ),
+        format!(
+            "{} user_settings {}",
+            from.id,
+            if user.profile_shown {
+                "profile_hide"
+            } else {
+                "profile_show"
+            }
+        ),
+    ));
+
+    buttons.push(InlineKeyboardButton::callback(
+        format!(
+            "{} Always show album art",
+            if user.cover_shown { "✅" } else { "⬜" }
+        ),
+        format!(
+            "{} user_settings {}",
+            from.id,
+            if user.cover_shown {
+                "cover_hide"
+            } else {
+                "cover_show"
+            }
+        ),
+    ));
+
+    buttons.push(InlineKeyboardButton::callback(
+        "❌ Unlink your account",
+        format!("{} user_settings {}", from.id, "unset"),
+    ));
+
+    let buttons2d = buttons.into_iter().map(|x| vec![x]).collect::<Vec<_>>();
 
     let name_text = utils::name_with_link(&from, &user);
     utils::send_or_edit_message(
@@ -772,7 +831,7 @@ async fn user_settings_command(
         msg,
         inline_message_id,
         edit,
-        InlineKeyboardMarkup::new(buttons).into(),
+        InlineKeyboardMarkup::new(buttons2d).into(),
         true,
     )
     .await?;
@@ -1065,6 +1124,7 @@ async fn random_command(
 
     let text: Option<String>;
     let mut search_text: Option<String> = None;
+    let mut album_art_url: Option<String> = None;
     match arg {
         "artist" => {
             let arr = api_requester::fetch_artists(
@@ -1093,6 +1153,7 @@ async fn random_command(
             .await?;
             text = arr.choose(&mut rand::rng()).map(|x| {
                 search_text = (x.artist.clone() + " " + &x.name.clone()).into();
+                album_art_url = x.album_art_url.clone();
                 format!(
                     "{} — {}\n({} plays)",
                     utils::replace_html_symbols(&x.artist),
@@ -1109,15 +1170,32 @@ async fn random_command(
                 limit.into(),
             )
             .await?;
-            text = arr.choose(&mut rand::rng()).map(|x| {
-                search_text = (x.artist.clone() + " " + &x.name.clone()).into();
-                format!(
+            let track = arr.choose(&mut rand::rng());
+            if let Some(track) = track {
+                search_text = (track.artist.clone() + " " + &track.name.clone()).into();
+
+                if user.api_type() == ApiType::Lastfm {
+                    let track_info = api_requester::fetch_lastfm_track(
+                        None,
+                        track.artist.clone(),
+                        track.name.clone(),
+                    )
+                    .await;
+
+                    if let Ok(track_info) = track_info {
+                        album_art_url = track_info.album_art_url;
+                    }
+                }
+
+                text = Some(format!(
                     "{} — {}\n({} plays)",
-                    utils::replace_html_symbols(&x.artist),
-                    utils::replace_html_symbols(&x.name),
-                    x.user_playcount.to_formatted_string(&Locale::en)
-                )
-            });
+                    utils::replace_html_symbols(&track.artist),
+                    utils::replace_html_symbols(&track.name),
+                    track.user_playcount.to_formatted_string(&Locale::en)
+                ));
+            } else {
+                text = None;
+            }
         }
         _ => {
             return Ok(());
@@ -1135,16 +1213,37 @@ async fn random_command(
                 InlineKeyboardButton::url("🔎", spotify_url),
                 InlineKeyboardButton::callback("🔃", format!("{} random {}", from.id.0, arg)),
             ]]);
-            utils::send_or_edit_message(
-                bot,
-                &text,
-                msg,
-                inline_message_id,
-                edit,
-                keyboard.into(),
-                true,
-            )
-            .await?;
+
+            if arg == "artist" {
+                utils::send_or_edit_message(
+                    bot,
+                    &text,
+                    msg,
+                    inline_message_id,
+                    edit,
+                    keyboard.into(),
+                    true,
+                )
+                .await?;
+            } else {
+                let media = InputMediaPhoto::new(InputFile::url(Url::parse(
+                    album_art_url
+                        .as_ref()
+                        .map_or(consts::LASTFM_STAR_URL, |v| v),
+                )?))
+                .caption(text);
+
+                utils::send_or_edit_photo(
+                    bot,
+                    media,
+                    msg,
+                    inline_message_id.as_ref(),
+                    edit,
+                    Some(keyboard),
+                    false,
+                )
+                .await?;
+            }
         }
         None => {
             utils::send_or_edit_message(
@@ -1310,18 +1409,6 @@ async fn compat_command(
     };
 
     utils::send_or_edit_message(bot, text.as_str(), msg.into(), None, false, None, true).await?;
-    Ok(())
-}
-
-async fn unset_command(
-    bot: &Bot,
-    msg: &Message,
-    user: User,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
-    DB.lock().unwrap().delete_user(user.tg_user_id).unwrap();
-
-    utils::send_or_edit_message(bot, consts::UNSET, msg.into(), None, false, None, true).await?;
-
     Ok(())
 }
 
@@ -1568,11 +1655,13 @@ async fn fetch_lastfm_infos(
     title_p: String,
 ) -> Result<String, Box<dyn Error + Send + Sync>> {
     let artist_req = task::spawn(api_requester::fetch_lastfm_artist(
-        username.clone(),
+        username.clone().into(),
         artist_p.clone(),
     ));
     let track_req = task::spawn(api_requester::fetch_lastfm_track(
-        username, artist_p, title_p,
+        username.into(),
+        artist_p,
+        title_p,
     ));
 
     let artist = artist_req

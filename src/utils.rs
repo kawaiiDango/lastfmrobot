@@ -188,7 +188,8 @@ pub async fn send_or_edit_photo(
                 .send_photo(m.chat.id, media.media)
                 .reply_parameters(ReplyParameters::new(m.id).allow_sending_without_reply())
                 .parse_mode(ParseMode::Html)
-                .caption(media.caption.unwrap_or_default());
+                .caption(media.caption.unwrap_or_default())
+                .show_caption_above_media(media.show_caption_above_media);
             if keyboard.is_some() {
                 x = x.reply_markup(keyboard.unwrap())
             }
@@ -206,7 +207,11 @@ pub async fn send_or_edit_photo(
                 }
             }
         } else {
-            let mut x = bot.edit_message_media(m.chat.id, m.id, InputMedia::Photo(media));
+            let mut x = bot.edit_message_media(
+                m.chat.id,
+                m.id,
+                InputMedia::Photo(media.parse_mode(ParseMode::Html)),
+            );
             if keyboard.is_some() {
                 x = x.reply_markup(keyboard.unwrap())
             }
@@ -233,7 +238,7 @@ pub async fn send_or_edit_photo(
             .caption(media.caption.unwrap_or_default())
             .parse_mode(ParseMode::Html)
         } else {
-            media
+            media.parse_mode(ParseMode::Html)
         };
 
         let mut x =

@@ -2,7 +2,7 @@ use std::{error::Error, sync::LazyLock, time::Duration};
 
 use http::Extensions;
 use http_cache_reqwest::{Cache, CacheMode, CacheOptions, HttpCache, MokaManager};
-use reqwest::{header::HeaderValue, Request, Response, StatusCode, Url};
+use reqwest::{Request, Response, StatusCode, Url, header::HeaderValue};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware, Middleware, Next};
 use serde_json::Value;
 use strum_macros::{Display, EnumString, IntoStaticStr};
@@ -155,6 +155,7 @@ pub static CLIENT: LazyLock<ClientWithMiddleware> = LazyLock::new(|| {
         reqwest::ClientBuilder::new()
             .timeout(Duration::from_secs(25))
             .https_only(true)
+            .user_agent("LastFM Robot (Telegram bot)")
             .build()
             .unwrap(),
     )
@@ -225,7 +226,7 @@ fn get_biggest_lastfm_image(json_value: &serde_json::Value) -> Option<String> {
 }
 
 pub async fn fetch_lastfm_track(
-    username: String,
+    username: Option<String>,
     artist: String,
     track: String,
 ) -> Result<Track, Box<dyn Error + Send + Sync>> {
@@ -236,7 +237,7 @@ pub async fn fetch_lastfm_track(
             ("method", "track.getInfo"),
             ("track", track.as_str()),
             ("artist", artist.as_str()),
-            ("user", username.as_str()),
+            ("user", username.unwrap_or_default().as_str()),
             ("api_key", config::LASTFM_API_KEY),
             ("format", "json"),
         ],
@@ -255,6 +256,11 @@ pub async fn fetch_lastfm_track(
     let album = if let Some(album_obj) = album_obj {
         let x = album_obj["title"].as_str().unwrap_or_default();
         (!x.is_empty()).then_some(x.to_string())
+    } else {
+        None
+    };
+    let album_art_url = if let Some(album_obj) = album_obj {
+        get_biggest_lastfm_image(album_obj)
     } else {
         None
     };
@@ -310,7 +316,7 @@ pub async fn fetch_lastfm_track(
         user_playcount,
         user_loved,
         duration,
-        album_art_url: None,
+        album_art_url,
         date: None,
         now_playing: false,
         tags,
@@ -386,7 +392,7 @@ pub async fn fetch_lastfm_album(
 }
 
 pub async fn fetch_lastfm_artist(
-    username: String,
+    username: Option<String>,
     artist: String,
 ) -> Result<Artist, Box<dyn Error + Send + Sync>> {
     let base_url = get_base_url(&ApiType::Lastfm);
@@ -395,7 +401,7 @@ pub async fn fetch_lastfm_artist(
         &[
             ("method", "artist.getInfo"),
             ("artist", artist.as_str()),
-            ("user", username.as_str()),
+            ("user", username.unwrap_or_default().as_str()),
             ("api_key", config::LASTFM_API_KEY),
             ("format", "json"),
         ],
