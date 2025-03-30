@@ -4,6 +4,7 @@ A telegram bot that supports last.fm, libre.fm and listenbrainz.org.
 https://t.me/lastfmrobot
 
 This project was compiled with rust nightly.
+It may use features that are not available in rust stable.
 
 ## Commands
 
@@ -21,8 +22,7 @@ Below is a list of commands supported by this bot:
 - `/topkek` — Top 5 artists/albums/tracks as text
 - `/flex` — Flewx your nuwmbers
 - `/set` — Set your username
-- `/unset` — Unlink yourself from this bot
-- `/user_settings` — Show/hide your profile link
+- `/preferences` — Your pwefewences for this bot
 - `/help` — Weeeeelp!
 - `/privacy` — Priwacy powicy
 

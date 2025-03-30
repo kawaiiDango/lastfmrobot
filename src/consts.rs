@@ -11,15 +11,16 @@ pub const LASTFM_STAR_URL: &str =
 pub const BOTS_MUSIC: &str = "We bots don't listen to music, baaaaaka.";
 pub const NOT_FOUND: &str = "Not found.";
 pub const USER_NOT_FOUND: &str = "No such uwuser";
-pub const PRIVATE_PROFILE: &str = "Your scrobbles are hidden. To use the bot, disable that at https://www.last.fm/settings/privacy";
+pub const PRIVATE_PROFILE: &str = "Your scrobbles are hidden. To use this bot, disable that at https://www.last.fm/settings/privacy";
 pub const NO_SCROBBLES: &str = "No scrwobbles fownd!";
 pub const UNSET: &str = "Your uwusername has been unlinked from the bot.";
 pub const NO: &str = "Nuuuuuuuuuu!";
 pub const THEY_NOT_REGISTERED: &str = "They need to /set their uwusername with me.";
 pub const COMPAT_CLICK: &str =
     "Usage: compat 1y. Reply to someone's message in a group, with this command.";
-pub const COLLAGE_CLICK: &str = "usage: <b>collage 5 1m for a 5x5</b> album art collage for the last one month.\n<b>/collage clean 4 alltime</b> for a 4x4 overall collage without text, etc.";
-pub const TOP_CLICK: &str = "usage: <b>/topkek artists 1m , /topkek tracks alltime</b>";
+pub const COLLAGE_USAGE: &str = "Direct usage: <b>collage 3 1m, /collage clean 4 alltime</b> etc.";
+pub const TOP_USAGE: &str = "Direct usage: <b>/topkek artists 1m , /topkek tracks alltime</b>";
+pub const RANDOM_USAGE: &str = "Direct usage: <b>/random artists 1m , /random tracks alltime</b>";
 pub const COLLAGE_LIBREFM: &str = "Collages aren't available for Librefm.";
 pub const SET_CLICK: &str = "usage: <b>/set username</b> to set your username for lastfm\n<b>/set username listenbrainz</b> to set your username for listenbrainz";
 pub const ANON_KUN: &str = "Hieee anon kun";
@@ -32,4 +33,4 @@ to their scrobbling service (Lastfm, Librefm or ListenBrainz) username and the u
 
 This information is used to fetch and display the user's scrobble information and for overall analytics.
 
-The user may choose to delete this information and unlink themselves from the bot, by clicking on Unlink on the /user_settings command."#;
+The user may choose to delete this information and unlink themselves from the bot, by clicking on Unlink on the /preferences command."#;

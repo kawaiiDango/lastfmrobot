@@ -65,7 +65,7 @@ pub fn name_with_link(tg_user: &teloxide::types::User, db_user: &db::User) -> St
                 db_user.account_username, name
             ),
             ApiType::Librefm => format!(
-                "<a href=\"https://www.libre.fm/user/{}\">{}</a>",
+                "<a href=\"https://libre.fm/user/{}\">{}</a>",
                 db_user.account_username, name
             ),
             ApiType::Listenbrainz => format!(

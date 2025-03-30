@@ -2,7 +2,7 @@
 
 use std::{
     cmp::min,
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     error::Error,
     fs::File,
     io::{BufRead, BufReader},
@@ -81,8 +81,7 @@ enum Command {
         arg: String,
     },
     #[command(description = "Your pwefewences for this bot")]
-    #[allow(non_camel_case_types)]
-    User_Settings,
+    Preferences,
     #[command(description = "Weeeeelp!")]
     Help,
     #[command(description = "Priwacy powicy")]
@@ -91,6 +90,13 @@ enum Command {
 
 static DB: LazyLock<Mutex<Db>> = LazyLock::new(|| Mutex::new(Db::new()));
 static ME: OnceLock<Me> = OnceLock::new();
+static COMMAND_USAGE_MAP: LazyLock<HashMap<String, &str>> = LazyLock::new(|| {
+    let mut h = HashMap::new();
+    h.insert("collage".to_string(), consts::COLLAGE_USAGE);
+    h.insert("topkek".to_string(), consts::TOP_USAGE);
+    h.insert("random".to_string(), consts::RANDOM_USAGE);
+    h
+});
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -119,7 +125,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         "random",
         "topkek",
         "flex",
-        "user_settings",
+        "preferences",
         "help",
         "privacy",
     ]
@@ -270,24 +276,36 @@ async fn message_handler(bot: Bot, msg: Message) -> Result<(), Box<dyn Error + S
                 loved_command(&bot, Some(&msg), None, None, false, user).await?;
                 track("loved", from).await;
             }
-            Ok(Command::User_Settings) => {
-                user_settings_command(&bot, Some(&msg), None, None, false, "", user).await?;
-                track("user_settings", from).await;
+            Ok(Command::Preferences) => {
+                preferences_command(&bot, Some(&msg), None, None, false, "", user).await?;
+                track("preferences", from).await;
             }
             Ok(Command::Collage { arg }) => {
-                collage_command(&bot, Some(&msg), None, None, false, &arg, user).await?;
+                if arg.is_empty() {
+                    period_chooser(&bot, Some(&msg), None, None, false, "collage").await?;
+                } else {
+                    collage_command(&bot, Some(&msg), None, None, false, &arg, user).await?;
+                }
                 track("collage", from).await;
             }
             Ok(Command::Topkek { arg }) => {
-                top_command(&bot, Some(&msg), None, None, false, &arg, user).await?;
-                track("top", from).await;
+                if arg.is_empty() {
+                    type_chooser(&bot, Some(&msg), None, None, false, "topkek").await?;
+                } else {
+                    topkek_command(&bot, Some(&msg), None, None, false, &arg, user).await?;
+                }
+                track("topkek", from).await;
             }
             Ok(Command::Compat { arg }) => {
                 compat_command(&bot, &msg, &arg, user).await?;
                 track("compat", from).await;
             }
             Ok(Command::Random { arg }) => {
-                random_chooser_command(&bot, Some(&msg), None, None, false, &arg, user).await?;
+                if arg.is_empty() {
+                    type_chooser(&bot, Some(&msg), None, None, false, "random").await?;
+                } else {
+                    random_command(&bot, Some(&msg), None, None, false, &arg, user).await?;
+                }
                 track("random", from).await;
             }
             Ok(Command::Flex) => {
@@ -637,7 +655,8 @@ async fn loved_command(
 
             let tracks_text = tracks
                 .iter()
-                .map(|track| {
+                .enumerate()
+                .map(|(index, track)| {
                     let time_ago = if track.date.is_none() {
                         "".to_owned()
                     } else {
@@ -649,7 +668,8 @@ async fn loved_command(
                     let spotify_url = format!("https://open.spotify.com/search/{}", &fragment);
 
                     format!(
-                        "💗 <i>{}</i> — <a href=\"{}\"><b>{}</b></a>{}",
+                        "{}. 💗 <i>{}</i> — <a href=\"{}\"><b>{}</b></a>{}",
+                        index + 1,
                         utils::replace_html_symbols(&track.artist),
                         spotify_url,
                         utils::replace_html_symbols(&track.name),
@@ -719,7 +739,7 @@ async fn set_command(
 
             DB.lock().unwrap().upsert_user(&new_user)?;
             format!(
-                "✅Username set for {0}!\n\nUse /user_settings to show links to your {0} profile, or always show album art for status if available.\n\nNot {0}? Change your account type using the buttons.",
+                "✅Username set for {0}!\n\nUse /preferences to show links to your {0} profile, or always show album art for status if available.\n\nNot {0}? Change your account type using the buttons.",
                 api_type
             )
         }
@@ -747,7 +767,7 @@ async fn set_command(
     Ok(())
 }
 
-async fn user_settings_command(
+async fn preferences_command(
     bot: &Bot,
     msg: Option<&Message>,
     inline_message_id: Option<String>,
@@ -791,7 +811,7 @@ async fn user_settings_command(
             if user.profile_shown { "✅" } else { "⬜" }
         ),
         format!(
-            "{} user_settings {}",
+            "{} preferences {}",
             from.id,
             if user.profile_shown {
                 "profile_hide"
@@ -807,7 +827,7 @@ async fn user_settings_command(
             if user.cover_shown { "✅" } else { "⬜" }
         ),
         format!(
-            "{} user_settings {}",
+            "{} preferences {}",
             from.id,
             if user.cover_shown {
                 "cover_hide"
@@ -819,7 +839,7 @@ async fn user_settings_command(
 
     buttons.push(InlineKeyboardButton::callback(
         "❌ Unlink your account",
-        format!("{} user_settings {}", from.id, "unset"),
+        format!("{} preferences {}", from.id, "unset"),
     ));
 
     let buttons2d = buttons.into_iter().map(|x| vec![x]).collect::<Vec<_>>();
@@ -839,7 +859,7 @@ async fn user_settings_command(
     Ok(())
 }
 
-async fn top_command(
+async fn topkek_command(
     bot: &Bot,
     msg: Option<&Message>,
     inline_message_id: Option<String>,
@@ -851,14 +871,9 @@ async fn top_command(
     let n = 5;
     let from = utils::choose_the_from(msg, inline_from);
 
-    if arg.is_empty() {
-        utils::send_or_edit_message(bot, consts::TOP_CLICK, msg, None, false, None, true).await?;
-        return Ok(());
-    }
-
     let (_, period, entry_type, _) = utils::parse_collage_arg(arg);
 
-    let text = match entry_type {
+    let top_list = match entry_type {
         EntryType::Artist => {
             api_requester::fetch_artists(&user.account_username, &period, &user.api_type(), None)
                 .await
@@ -879,7 +894,6 @@ async fn top_command(
                             )
                         })
                         .collect::<Vec<_>>()
-                        .join("\n")
                 })
         }
         EntryType::Album => {
@@ -904,7 +918,6 @@ async fn top_command(
                             )
                         })
                         .collect::<Vec<_>>()
-                        .join("\n")
                 })
         }
         EntryType::Track => {
@@ -929,7 +942,6 @@ async fn top_command(
                             )
                         })
                         .collect::<Vec<_>>()
-                        .join("\n")
                 })
         }
     };
@@ -940,7 +952,12 @@ async fn top_command(
             utils::name_with_link(&from, &user),
             entry_type,
             period,
-            text?
+            top_list?
+                .iter()
+                .enumerate()
+                .map(|(i, x)| format!("{}. {}", i + 1, x))
+                .collect::<Vec<_>>()
+                .join("\n")
         ),
         msg,
         inline_message_id,
@@ -962,12 +979,6 @@ async fn collage_command(
     user: User,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let from = utils::choose_the_from(msg, inline_from);
-
-    if arg.is_empty() {
-        utils::send_or_edit_message(bot, consts::COLLAGE_CLICK, msg, None, false, None, true)
-            .await?;
-        return Ok(());
-    }
 
     if user.api_type() == ApiType::Librefm {
         utils::send_or_edit_message(
@@ -1069,37 +1080,131 @@ async fn collage_command(
     Ok(())
 }
 
-async fn random_chooser_command(
+async fn type_chooser(
     bot: &Bot,
     msg: Option<&Message>,
     inline_message_id: Option<String>,
     inline_from: Option<&teloxide::types::User>,
     edit: bool,
-    arg: &str,
-    user: User,
+    command: &str,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    if arg.is_empty() {
-        let from = utils::choose_the_from(msg, inline_from);
-        let user_id = from.id.0;
-        let keyboard = InlineKeyboardMarkup::new(vec![vec![
-            InlineKeyboardButton::callback("🎵 Track", format!("{} random track", user_id)),
-            InlineKeyboardButton::callback("💿 Album", format!("{} random album", user_id)),
-            InlineKeyboardButton::callback("🎙️ Artist", format!("{} random artist", user_id)),
-        ]]);
+    let from = utils::choose_the_from(msg, inline_from);
+    let user_id = from.id.0;
+    let keyboard = InlineKeyboardMarkup::new(vec![vec![
+        InlineKeyboardButton::callback("🎵 Track", format!("{} {} track", user_id, command)),
+        InlineKeyboardButton::callback("💿 Album", format!("{} {} album", user_id, command)),
+        InlineKeyboardButton::callback("🎙️ Artist", format!("{} {} artist", user_id, command)),
+    ]]);
 
-        utils::send_or_edit_message(
-            bot,
-            "Choose:",
-            msg,
-            inline_message_id,
-            edit,
-            keyboard.into(),
-            true,
+    let direct_usage_text = if inline_message_id.is_none() {
+        format!(
+            "\n\n{}",
+            COMMAND_USAGE_MAP[command.split_whitespace().next().unwrap()]
         )
-        .await?;
     } else {
-        random_command(bot, msg, inline_message_id, inline_from, edit, arg, user).await?;
-    }
+        "".to_string()
+    };
+
+    utils::send_or_edit_message(
+        bot,
+        &format!("Choose type:{}", direct_usage_text),
+        msg,
+        inline_message_id,
+        edit,
+        keyboard.into(),
+        true,
+    )
+    .await?;
+    Ok(())
+}
+
+async fn period_chooser(
+    bot: &Bot,
+    msg: Option<&Message>,
+    inline_message_id: Option<String>,
+    inline_from: Option<&teloxide::types::User>,
+    edit: bool,
+    commands: &str,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let from = utils::choose_the_from(msg, inline_from);
+    let user_id = from.id.0;
+    let keyboard = InlineKeyboardMarkup::new(vec![
+        vec![
+            InlineKeyboardButton::callback("1w", format!("{} {} 1w", user_id, commands)),
+            InlineKeyboardButton::callback("1m", format!("{} {} 1m", user_id, commands)),
+            InlineKeyboardButton::callback("3m", format!("{} {} 3m", user_id, commands)),
+        ],
+        vec![
+            InlineKeyboardButton::callback("6m", format!("{} {} 6m", user_id, commands)),
+            InlineKeyboardButton::callback("1y", format!("{} {} 1y", user_id, commands)),
+            InlineKeyboardButton::callback("alltime", format!("{} {} alltime", user_id, commands)),
+        ],
+    ]);
+
+    let direct_usage_text = if inline_message_id.is_none() {
+        format!(
+            "\n\n{}",
+            COMMAND_USAGE_MAP[commands.split_whitespace().next().unwrap()]
+        )
+    } else {
+        "".to_string()
+    };
+
+    utils::send_or_edit_message(
+        bot,
+        &format!("Choose time period:{}", direct_usage_text),
+        msg,
+        inline_message_id,
+        edit,
+        keyboard.into(),
+        true,
+    )
+    .await?;
+    Ok(())
+}
+
+async fn size_chooser(
+    bot: &Bot,
+    msg: Option<&Message>,
+    inline_message_id: Option<String>,
+    inline_from: Option<&teloxide::types::User>,
+    edit: bool,
+    commands: &str,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let from = utils::choose_the_from(msg, inline_from);
+    let user_id = from.id.0;
+    let keyboard = InlineKeyboardMarkup::new(vec![
+        vec![
+            InlineKeyboardButton::callback("1", format!("{} {} 1", user_id, commands)),
+            InlineKeyboardButton::callback("2", format!("{} {} 2", user_id, commands)),
+            InlineKeyboardButton::callback("3", format!("{} {} 3", user_id, commands)),
+        ],
+        vec![
+            InlineKeyboardButton::callback("4", format!("{} {} 4", user_id, commands)),
+            InlineKeyboardButton::callback("5", format!("{} {} 5", user_id, commands)),
+            InlineKeyboardButton::callback("6", format!("{} {} 6", user_id, commands)),
+        ],
+    ]);
+
+    let direct_usage_text = if inline_message_id.is_none() {
+        format!(
+            "\n\n{}",
+            COMMAND_USAGE_MAP[commands.split_whitespace().next().unwrap()]
+        )
+    } else {
+        "".to_string()
+    };
+
+    utils::send_or_edit_message(
+        bot,
+        &format!("Choose a size:{}", direct_usage_text),
+        msg,
+        inline_message_id,
+        edit,
+        keyboard.into(),
+        true,
+    )
+    .await?;
     Ok(())
 }
 
@@ -1109,7 +1214,7 @@ async fn random_command(
     inline_message_id: Option<String>,
     inline_from: Option<&teloxide::types::User>,
     edit: bool,
-    arg: &str,
+    args: &str,
     user: User,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let from = utils::choose_the_from(msg, inline_from);
@@ -1121,19 +1226,15 @@ async fn random_command(
     } else {
         1000
     };
+    let (_, period, entry_type, _) = utils::parse_collage_arg(args);
 
     let text: Option<String>;
     let mut search_text: Option<String> = None;
     let mut album_art_url: Option<String> = None;
-    match arg {
-        "artist" => {
-            let arr = api_requester::fetch_artists(
-                &username,
-                &TimePeriod::AllTime,
-                &api_type,
-                limit.into(),
-            )
-            .await?;
+    match entry_type {
+        EntryType::Artist => {
+            let arr =
+                api_requester::fetch_artists(&username, &period, &api_type, limit.into()).await?;
             text = arr.choose(&mut rand::rng()).map(|x| {
                 search_text = x.name.clone().into();
                 format!(
@@ -1143,14 +1244,9 @@ async fn random_command(
                 )
             });
         }
-        "album" => {
-            let arr = api_requester::fetch_albums(
-                &username,
-                &TimePeriod::AllTime,
-                &api_type,
-                limit.into(),
-            )
-            .await?;
+        EntryType::Album => {
+            let arr =
+                api_requester::fetch_albums(&username, &period, &api_type, limit.into()).await?;
             text = arr.choose(&mut rand::rng()).map(|x| {
                 search_text = (x.artist.clone() + " " + &x.name.clone()).into();
                 album_art_url = x.album_art_url.clone();
@@ -1162,14 +1258,9 @@ async fn random_command(
                 )
             });
         }
-        "track" => {
-            let arr = api_requester::fetch_tracks(
-                &username,
-                &TimePeriod::AllTime,
-                &api_type,
-                limit.into(),
-            )
-            .await?;
+        EntryType::Track => {
+            let arr =
+                api_requester::fetch_tracks(&username, &period, &api_type, limit.into()).await?;
             let track = arr.choose(&mut rand::rng());
             if let Some(track) = track {
                 search_text = (track.artist.clone() + " " + &track.name.clone()).into();
@@ -1197,9 +1288,6 @@ async fn random_command(
                 text = None;
             }
         }
-        _ => {
-            return Ok(());
-        }
     }
     match text {
         Some(text) => {
@@ -1211,10 +1299,18 @@ async fn random_command(
 
             let keyboard = InlineKeyboardMarkup::new(vec![vec![
                 InlineKeyboardButton::url("🔎", spotify_url),
-                InlineKeyboardButton::callback("🔃", format!("{} random {}", from.id.0, arg)),
+                InlineKeyboardButton::callback("🔃", format!("{} random {}", from.id.0, args)),
             ]]);
 
-            if arg == "artist" {
+            let text = format!(
+                "{}'s random {} for {}\n\n{}",
+                utils::name_with_link(&from, &user),
+                entry_type,
+                period,
+                text,
+            );
+
+            if entry_type == EntryType::Artist {
                 utils::send_or_edit_message(
                     bot,
                     &text,
@@ -1444,48 +1540,6 @@ async fn inline_query_handler(
     )
     .reply_markup(keyboard.clone());
 
-    let collage1w = InlineQueryResultArticle::new(
-        "collage 3 1w",
-        "3x3 1 week collage",
-        InputMessageContent::Text(InputMessageContentText::new("3x3 1 week collage")),
-    )
-    .reply_markup(keyboard.clone());
-
-    let collage1m = InlineQueryResultArticle::new(
-        "collage 3 1m",
-        "3x3 1 month collage",
-        InputMessageContent::Text(InputMessageContentText::new("3x3 1 month collage")),
-    )
-    .reply_markup(keyboard.clone());
-
-    let collage3m = InlineQueryResultArticle::new(
-        "collage 3 3m",
-        "3x3 3 months collage",
-        InputMessageContent::Text(InputMessageContentText::new("3x3 3 months collage")),
-    )
-    .reply_markup(keyboard.clone());
-
-    let collage6m = InlineQueryResultArticle::new(
-        "collage 3 6m",
-        "3x3 6 months collage",
-        InputMessageContent::Text(InputMessageContentText::new("3x3 6 months collage")),
-    )
-    .reply_markup(keyboard.clone());
-
-    let collage1y = InlineQueryResultArticle::new(
-        "collage 3 1y",
-        "3x3 1 year collage",
-        InputMessageContent::Text(InputMessageContentText::new("3x3 1 year collage")),
-    )
-    .reply_markup(keyboard.clone());
-
-    let collage_overall = InlineQueryResultArticle::new(
-        "collage 3 overall",
-        "3x3 all time collage",
-        InputMessageContent::Text(InputMessageContentText::new("3x3 all time collage")),
-    )
-    .reply_markup(keyboard.clone());
-
     let random = InlineQueryResultArticle::new(
         "random",
         "Shuffle your scrobbles",
@@ -1500,18 +1554,30 @@ async fn inline_query_handler(
     )
     .reply_markup(keyboard.clone());
 
+    let topkek = InlineQueryResultArticle::new(
+        "topkek",
+        "Top artists/albums/tracks as text",
+        InputMessageContent::Text(InputMessageContentText::new(
+            "Top artists/albums/tracks as text",
+        )),
+    )
+    .reply_markup(keyboard.clone());
+
+    let collage = InlineQueryResultArticle::new(
+        "collage",
+        "Album art collage",
+        InputMessageContent::Text(InputMessageContentText::new("Album art collage")),
+    )
+    .reply_markup(keyboard.clone());
+
     let results = vec![
         InlineQueryResult::Article(status),
         InlineQueryResult::Article(status_full),
         InlineQueryResult::Article(loved),
         InlineQueryResult::Article(flex),
+        InlineQueryResult::Article(topkek),
         InlineQueryResult::Article(random),
-        InlineQueryResult::Article(collage1w),
-        InlineQueryResult::Article(collage1m),
-        InlineQueryResult::Article(collage3m),
-        InlineQueryResult::Article(collage6m),
-        InlineQueryResult::Article(collage1y),
-        InlineQueryResult::Article(collage_overall),
+        InlineQueryResult::Article(collage),
     ];
 
     if user.is_none() {
@@ -1546,7 +1612,6 @@ async fn inline_result_handler(
         .splitn(2, ' ')
         .collect::<Vec<_>>();
     let result_id = *splits.first().unwrap_or(&"");
-    let arg = *splits.last().unwrap_or(&"");
     let from = Some(&chosen_inline_result.from);
     let user = get_registered_user(
         &bot,
@@ -1604,27 +1669,25 @@ async fn inline_result_handler(
             track("inline_loved", from).await;
         }
         "collage" => {
-            collage_command(
+            period_chooser(
                 &bot,
                 None,
                 chosen_inline_result.inline_message_id,
                 from,
                 true,
-                arg,
-                user,
+                "collage",
             )
             .await?;
             track("inline_collage", from).await;
         }
         "random" => {
-            random_chooser_command(
+            type_chooser(
                 &bot,
                 None,
                 chosen_inline_result.inline_message_id,
                 from,
                 true,
-                "",
-                user,
+                "random",
             )
             .await?;
             track("inline_random", from).await;
@@ -1640,6 +1703,18 @@ async fn inline_result_handler(
             )
             .await?;
             track("inline_flex", from).await;
+        }
+        "topkek" => {
+            type_chooser(
+                &bot,
+                None,
+                chosen_inline_result.inline_message_id,
+                from,
+                true,
+                "topkek",
+            )
+            .await?;
+            track("inline_topkek", from).await;
         }
         _ => {
             log::error!("Unknown result id: {result_id}");
@@ -1840,41 +1915,105 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
         }
 
         "collage" => {
-            let keyboard = InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
-                "🖼️",
-                "0 loading",
-            )]]);
-
-            utils::edit_markup(&bot, *regular_message, inline_message_id.as_ref(), keyboard)
+            let arg_splits: Vec<&str> = arg.split(' ').collect();
+            if arg_splits.is_empty() {
+                period_chooser(
+                    &bot,
+                    *regular_message,
+                    inline_message_id,
+                    from.into(),
+                    true,
+                    data,
+                )
                 .await?;
+            } else if arg_splits.len() == 1 {
+                size_chooser(
+                    &bot,
+                    *regular_message,
+                    inline_message_id,
+                    from.into(),
+                    true,
+                    &format!("{} {}", data, arg_splits[0]),
+                )
+                .await?;
+            } else {
+                let keyboard =
+                    InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
+                        "⌛",
+                        "0 loading",
+                    )]]);
 
-            collage_command(
-                &bot,
-                *regular_message,
-                inline_message_id,
-                from.into(),
-                true,
-                &arg,
-                user,
-            )
-            .await?;
+                utils::edit_markup(&bot, *regular_message, inline_message_id.as_ref(), keyboard)
+                    .await?;
+
+                collage_command(
+                    &bot,
+                    *regular_message,
+                    inline_message_id,
+                    from.into(),
+                    true,
+                    &arg,
+                    user,
+                )
+                .await?;
+            }
         }
 
         "random" => {
-            random_command(
-                &bot,
-                *regular_message,
-                inline_message_id,
-                from.into(),
-                true,
-                &arg,
-                user,
-            )
-            .await?;
+            let arg_splits: Vec<&str> = arg.split(' ').collect();
+
+            if arg_splits.len() != 2 {
+                period_chooser(
+                    &bot,
+                    *regular_message,
+                    inline_message_id,
+                    from.into(),
+                    true,
+                    &format!("{} {}", data, arg_splits[0]),
+                )
+                .await?;
+            } else {
+                random_command(
+                    &bot,
+                    *regular_message,
+                    inline_message_id,
+                    from.into(),
+                    true,
+                    &arg,
+                    user,
+                )
+                .await?;
+            }
         }
 
-        "user_settings" => {
-            user_settings_command(
+        "topkek" => {
+            let arg_splits: Vec<&str> = arg.split(' ').collect();
+            if arg_splits.len() != 2 {
+                period_chooser(
+                    &bot,
+                    *regular_message,
+                    inline_message_id,
+                    from.into(),
+                    true,
+                    &format!("{} {}", data, arg_splits[0]),
+                )
+                .await?;
+            } else {
+                topkek_command(
+                    &bot,
+                    *regular_message,
+                    inline_message_id,
+                    from.into(),
+                    true,
+                    &arg,
+                    user,
+                )
+                .await?;
+            }
+        }
+
+        "preferences" => {
+            preferences_command(
                 &bot,
                 *regular_message,
                 inline_message_id,
