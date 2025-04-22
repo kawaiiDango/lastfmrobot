@@ -8,3 +8,4 @@
 *.ttc
 *.ttf
 *.otf
+Cargo.lock
