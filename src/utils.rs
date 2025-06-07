@@ -53,7 +53,7 @@ pub fn human_readable_duration(ms: u64) -> String {
     let seconds = ms / 1000;
     let minutes = seconds / 60;
     let seconds_remaining = seconds % 60;
-    format!("{}:{:02}", minutes, seconds_remaining)
+    format!("{minutes}:{seconds_remaining:02}")
 }
 
 pub fn name_with_link(tg_user: &teloxide::types::User, db_user: &db::User) -> String {
@@ -110,12 +110,11 @@ pub async fn send_or_edit_message(
     keyboard: Option<InlineKeyboardMarkup>,
     disable_web_page_preview: bool,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    if msg.is_some() {
-        let m = &msg.unwrap();
+    if let Some(msg) = msg {
         if !edit {
             let mut x = bot
-                .send_message(m.chat.id, text)
-                .reply_parameters(ReplyParameters::new(m.id).allow_sending_without_reply())
+                .send_message(msg.chat.id, text)
+                .reply_parameters(ReplyParameters::new(msg.id).allow_sending_without_reply())
                 .parse_mode(ParseMode::Html)
                 .link_preview_options(LinkPreviewOptions {
                     is_disabled: disable_web_page_preview,
@@ -124,8 +123,8 @@ pub async fn send_or_edit_message(
                     prefer_large_media: true,
                     show_above_text: false,
                 });
-            if keyboard.is_some() {
-                x = x.reply_markup(keyboard.unwrap())
+            if let Some(kb) = keyboard {
+                x = x.reply_markup(kb)
             }
             match x.await {
                 Ok(_) => {
@@ -135,7 +134,7 @@ pub async fn send_or_edit_message(
                     if e.to_string().contains(
                         "Bad Request: not enough rights to send text messages to the chat",
                     ) {
-                        bot.leave_chat(m.chat.id).await?;
+                        bot.leave_chat(msg.chat.id).await?;
                     } else if e.to_string().contains("Bad Request: can't parse entities:") {
                         log::error!("can't parse: {text}");
                     }
@@ -144,7 +143,7 @@ pub async fn send_or_edit_message(
             }
         } else {
             let mut x = bot
-                .edit_message_text(m.chat.id, m.id, text)
+                .edit_message_text(msg.chat.id, msg.id, text)
                 .parse_mode(ParseMode::Html)
                 .link_preview_options(LinkPreviewOptions {
                     is_disabled: disable_web_page_preview,
@@ -153,21 +152,23 @@ pub async fn send_or_edit_message(
                     prefer_large_media: true,
                     show_above_text: false,
                 });
-            if keyboard.is_some() {
-                x = x.reply_markup(keyboard.unwrap())
+            if let Some(keyboard) = keyboard {
+                x = x.reply_markup(keyboard)
             }
             x.await?;
         }
-    } else if inline_message_id.is_some() && edit {
+    } else if let Some(inline_message_id) = inline_message_id
+        && edit
+    {
         let mut x = bot
-            .edit_message_text_inline(inline_message_id.unwrap(), text)
+            .edit_message_text_inline(inline_message_id, text)
             .parse_mode(ParseMode::Html)
             .disable_web_page_preview(disable_web_page_preview);
-        if keyboard.is_some() {
-            x = x.reply_markup(keyboard.unwrap())
+        if let Some(kb) = keyboard {
+            x = x.reply_markup(kb)
         }
         x.await?;
-    };
+    }
 
     Ok(())
 }
@@ -181,17 +182,16 @@ pub async fn send_or_edit_photo(
     keyboard: Option<InlineKeyboardMarkup>,
     create_file_id: bool,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    if msg.is_some() {
-        let m = &msg.unwrap();
+    if let Some(msg) = msg {
         if !edit {
             let mut x = bot
-                .send_photo(m.chat.id, media.media)
-                .reply_parameters(ReplyParameters::new(m.id).allow_sending_without_reply())
+                .send_photo(msg.chat.id, media.media)
+                .reply_parameters(ReplyParameters::new(msg.id).allow_sending_without_reply())
                 .parse_mode(ParseMode::Html)
                 .caption(media.caption.unwrap_or_default())
                 .show_caption_above_media(media.show_caption_above_media);
-            if keyboard.is_some() {
-                x = x.reply_markup(keyboard.unwrap())
+            if let Some(kb) = keyboard {
+                x = x.reply_markup(kb)
             }
             match x.await {
                 Ok(_) => {
@@ -201,23 +201,25 @@ pub async fn send_or_edit_photo(
                     if e.to_string()
                         .contains("Bad Request: not enough rights to send photos to the chat")
                     {
-                        bot.leave_chat(m.chat.id).await?;
+                        bot.leave_chat(msg.chat.id).await?;
                     }
                     return Err(Box::new(e));
                 }
             }
         } else {
             let mut x = bot.edit_message_media(
-                m.chat.id,
-                m.id,
+                msg.chat.id,
+                msg.id,
                 InputMedia::Photo(media.parse_mode(ParseMode::Html)),
             );
-            if keyboard.is_some() {
-                x = x.reply_markup(keyboard.unwrap())
+            if let Some(keyboard) = keyboard {
+                x = x.reply_markup(keyboard)
             }
             x.await?;
         }
-    } else if inline_message_id.is_some() && edit {
+    } else if let Some(inline_message_id) = inline_message_id
+        && edit
+    {
         // send the photo to the dump chat to get a file id.
         let new_media = if create_file_id {
             let dump_msg = bot
@@ -241,10 +243,9 @@ pub async fn send_or_edit_photo(
             media.parse_mode(ParseMode::Html)
         };
 
-        let mut x =
-            bot.edit_message_media_inline(inline_message_id.unwrap(), InputMedia::Photo(new_media));
-        if keyboard.is_some() {
-            x = x.reply_markup(keyboard.unwrap())
+        let mut x = bot.edit_message_media_inline(inline_message_id, InputMedia::Photo(new_media));
+        if let Some(keyboard) = keyboard {
+            x = x.reply_markup(keyboard)
         }
         x.await?;
     }
@@ -258,14 +259,12 @@ pub async fn edit_markup(
     inline_message_id: Option<&String>,
     keyboard: InlineKeyboardMarkup,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    if msg.is_some() {
-        let m = &msg.unwrap();
-
-        bot.edit_message_reply_markup(m.chat.id, m.id)
+    if let Some(msg) = msg {
+        bot.edit_message_reply_markup(msg.chat.id, msg.id)
             .reply_markup(keyboard)
             .await?;
-    } else if inline_message_id.is_some() {
-        bot.edit_message_reply_markup_inline(inline_message_id.unwrap())
+    } else if let Some(inline_message_id) = inline_message_id {
+        bot.edit_message_reply_markup_inline(inline_message_id)
             .reply_markup(keyboard)
             .await?;
     }

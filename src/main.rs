@@ -739,8 +739,7 @@ async fn set_command(
 
             DB.lock().unwrap().upsert_user(&new_user)?;
             format!(
-                "✅Username set for {0}!\n\nUse /preferences to show links to your {0} profile, or always show album art for status if available.\n\nNot {0}? Change your account type using the buttons.",
-                api_type
+                "✅Username set for {api_type}!\n\nUse /preferences to show links to your {api_type} profile, or always show album art for status if available.\n\nNot {api_type}? Change your account type using the buttons."
             )
         }
 
@@ -847,7 +846,7 @@ async fn preferences_command(
     let name_text = utils::name_with_link(&from, &user);
     utils::send_or_edit_message(
         bot,
-        &format!("Settings for {}", name_text),
+        &format!("Settings for {name_text}"),
         msg,
         inline_message_id,
         edit,
@@ -906,8 +905,7 @@ async fn topkek_command(
                         .map(|entry| {
                             let spotify_search_str = format!("{} {}", entry.name, entry.artist);
                             let fragment = url_escape::encode_fragment(spotify_search_str.as_str());
-                            let spotify_url =
-                                format!("https://open.spotify.com/search/{}", fragment);
+                            let spotify_url = format!("https://open.spotify.com/search/{fragment}");
 
                             format!(
                                 "<a href=\"{}\">{} — {}</a> -> {} plays",
@@ -1091,9 +1089,9 @@ async fn type_chooser(
     let from = utils::choose_the_from(msg, inline_from);
     let user_id = from.id.0;
     let keyboard = InlineKeyboardMarkup::new(vec![vec![
-        InlineKeyboardButton::callback("🎵 Track", format!("{} {} track", user_id, command)),
-        InlineKeyboardButton::callback("💿 Album", format!("{} {} album", user_id, command)),
-        InlineKeyboardButton::callback("🎙️ Artist", format!("{} {} artist", user_id, command)),
+        InlineKeyboardButton::callback("🎵 Track", format!("{user_id} {command} track")),
+        InlineKeyboardButton::callback("💿 Album", format!("{user_id} {command} album")),
+        InlineKeyboardButton::callback("🎙️ Artist", format!("{user_id} {command} artist")),
     ]]);
 
     let direct_usage_text = if inline_message_id.is_none() {
@@ -1107,7 +1105,7 @@ async fn type_chooser(
 
     utils::send_or_edit_message(
         bot,
-        &format!("Choose type:{}", direct_usage_text),
+        &format!("Choose type:{direct_usage_text}"),
         msg,
         inline_message_id,
         edit,
@@ -1130,14 +1128,14 @@ async fn period_chooser(
     let user_id = from.id.0;
     let keyboard = InlineKeyboardMarkup::new(vec![
         vec![
-            InlineKeyboardButton::callback("1w", format!("{} {} 1w", user_id, commands)),
-            InlineKeyboardButton::callback("1m", format!("{} {} 1m", user_id, commands)),
-            InlineKeyboardButton::callback("3m", format!("{} {} 3m", user_id, commands)),
+            InlineKeyboardButton::callback("1w", format!("{user_id} {commands} 1w")),
+            InlineKeyboardButton::callback("1m", format!("{user_id} {commands} 1m")),
+            InlineKeyboardButton::callback("3m", format!("{user_id} {commands} 3m")),
         ],
         vec![
-            InlineKeyboardButton::callback("6m", format!("{} {} 6m", user_id, commands)),
-            InlineKeyboardButton::callback("1y", format!("{} {} 1y", user_id, commands)),
-            InlineKeyboardButton::callback("alltime", format!("{} {} alltime", user_id, commands)),
+            InlineKeyboardButton::callback("6m", format!("{user_id} {commands} 6m")),
+            InlineKeyboardButton::callback("1y", format!("{user_id} {commands} 1y")),
+            InlineKeyboardButton::callback("alltime", format!("{user_id} {commands} alltime")),
         ],
     ]);
 
@@ -1152,7 +1150,7 @@ async fn period_chooser(
 
     utils::send_or_edit_message(
         bot,
-        &format!("Choose time period:{}", direct_usage_text),
+        &format!("Choose time period:{direct_usage_text}"),
         msg,
         inline_message_id,
         edit,
@@ -1175,14 +1173,14 @@ async fn size_chooser(
     let user_id = from.id.0;
     let keyboard = InlineKeyboardMarkup::new(vec![
         vec![
-            InlineKeyboardButton::callback("1", format!("{} {} 1", user_id, commands)),
-            InlineKeyboardButton::callback("2", format!("{} {} 2", user_id, commands)),
-            InlineKeyboardButton::callback("3", format!("{} {} 3", user_id, commands)),
+            InlineKeyboardButton::callback("1", format!("{user_id} {commands} 1")),
+            InlineKeyboardButton::callback("2", format!("{user_id} {commands} 2")),
+            InlineKeyboardButton::callback("3", format!("{user_id} {commands} 3")),
         ],
         vec![
-            InlineKeyboardButton::callback("4", format!("{} {} 4", user_id, commands)),
-            InlineKeyboardButton::callback("5", format!("{} {} 5", user_id, commands)),
-            InlineKeyboardButton::callback("6", format!("{} {} 6", user_id, commands)),
+            InlineKeyboardButton::callback("4", format!("{user_id} {commands} 4")),
+            InlineKeyboardButton::callback("5", format!("{user_id} {commands} 5")),
+            InlineKeyboardButton::callback("6", format!("{user_id} {commands} 6")),
         ],
     ]);
 
@@ -1197,7 +1195,7 @@ async fn size_chooser(
 
     utils::send_or_edit_message(
         bot,
-        &format!("Choose a size:{}", direct_usage_text),
+        &format!("Choose a size:{direct_usage_text}"),
         msg,
         inline_message_id,
         edit,
@@ -1439,18 +1437,14 @@ async fn compat_command(
         consts::ITS_ME.to_string()
     } else if user1.is_bot || user2.is_bot {
         consts::BOTS_MUSIC.to_string()
-    } else if db_user2.is_none() {
-        consts::THEY_NOT_REGISTERED.to_string()
-    } else {
+    } else if let Some(db_user2) = db_user2 {
         let (_size, period, _, _no_text) = utils::parse_collage_arg(arg);
         let period_text = period.to_string();
 
-        let db_user2_u = db_user2.unwrap();
-
         let username1 = db_user1_u.account_username.clone();
-        let username2 = db_user2_u.account_username.clone();
+        let username2 = db_user2.account_username.clone();
         let api_type1 = db_user1_u.api_type();
-        let api_type2 = db_user2_u.api_type();
+        let api_type2 = db_user2.api_type();
 
         let artists1 =
             api_requester::fetch_artists(&username1, &TimePeriod::OneYear, &api_type1, None)
@@ -1475,7 +1469,7 @@ async fn compat_command(
             }
         }
 
-        log::info!("common artists = {}/{}", numerator, denominator);
+        log::info!("common artists = {numerator}/{denominator}");
 
         let mut score = 0;
         if denominator > 2 {
@@ -1486,12 +1480,12 @@ async fn compat_command(
         }
 
         if mutual.is_empty() || score == 0 {
-            format!("No common artists in {}", period_text)
+            format!("No common artists in {period_text}")
         } else {
             format!(
                 "{} and {} listen to {}\n\nCompatibility score is {}%, based on {}",
                 utils::name_with_link(user1, &db_user1_u),
-                utils::name_with_link(user2, &db_user2_u),
+                utils::name_with_link(user2, &db_user2),
                 mutual
                     .iter()
                     .map(|x| utils::replace_html_symbols(x))
@@ -1502,6 +1496,8 @@ async fn compat_command(
                 period_text,
             )
         }
+    } else {
+        consts::THEY_NOT_REGISTERED.to_string()
     };
 
     utils::send_or_edit_message(bot, text.as_str(), msg.into(), None, false, None, true).await?;

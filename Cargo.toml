@@ -9,10 +9,10 @@ edition = "2024"
 teloxide = { git = "https://github.com/teloxide/teloxide.git", features = ["macros", "throttle"] }
 log = "0.4"
 pretty_env_logger = "0.5"
-tokio = { version =  "1.44", features = ["full"] }
+tokio = { version =  "1.45", features = ["full"] }
 reqwest = { version = "0.12", features = ["json"] }
 serde_json = "1.0"
-rusqlite = { version = "0.35", features = ["bundled"] }
+rusqlite = { version = "0.36", features = ["bundled"] }
 image = "0.25"
 imageproc = "0.25"
 ab_glyph = "0.2"

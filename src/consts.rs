@@ -4,7 +4,7 @@ pub const NOT_REGISTERED: &str =
     "You are not registered yet. Use /set [username] to link your uwusername.";
 pub const NOT_REGISTERED_INLINE: &str = "Link your account";
 pub const WELCOME_TEXT: &str = "Welcome to LastFM Robot. Use /set [username] to set your uwusername.\n
-Check out <a href=\"https://play.google.com/store/apps/details?id=com.arn.scrobble&utm_source=ts&utm_campaign=ts\">Pano Scrobbler</a> to set up scrobbling.\n
+Check out <a href=\"https://kawaiidango.github.io/pano-scrobbler\">Pano Scrobbler</a> to set up scrobbling.\n
 Some commands work without a /";
 pub const LASTFM_STAR_URL: &str =
     "https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png";

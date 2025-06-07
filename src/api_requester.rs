@@ -582,7 +582,7 @@ pub async fn fetch_recent_tracks(
 
     match api_type {
         ApiType::Listenbrainz => {
-            let url = format!("{}user/{}/playing-now", base_url, username);
+            let url = format!("{base_url}user/{username}/playing-now");
             let response = CLIENT
                 .get(&url)
                 .header("cache-control", cache_control)
@@ -597,7 +597,7 @@ pub async fn fetch_recent_tracks(
                 return Ok(all_tracks);
             }
 
-            let url = format!("{}user/{}/listens?count=3", base_url, username);
+            let url = format!("{base_url}user/{username}/listens?count=3");
             let response = CLIENT
                 .get(&url)
                 .header("cache-control", cache_control)
@@ -634,10 +634,10 @@ pub async fn fetch_recent_tracks(
             let err = json["error"]
                 .as_object()
                 .map(|x| x["#text"].as_str().unwrap_or_default());
-            if let Some(err) = err {
-                if !err.is_empty() {
-                    return Err(Box::from(err));
-                }
+            if let Some(err) = err
+                && !err.is_empty()
+            {
+                return Err(Box::from(err));
             }
 
             let tracks = parse_lastfm_tracks(&json["recenttracks"]["track"])?;
@@ -656,10 +656,7 @@ pub async fn fetch_loved_tracks(
 
     match api_type {
         ApiType::Listenbrainz => {
-            let url = format!(
-                "{}user/{}/get-feedback?metadata=true&count=5",
-                base_url, username
-            );
+            let url = format!("{base_url}user/{username}/get-feedback?metadata=true&count=5");
 
             let response = CLIENT.get(&url).send().await?;
             let json = response.json::<serde_json::Value>().await?;
