@@ -3,33 +3,36 @@ name = "lastfmrobot"
 version = "0.2.0"
 edition = "2024"
 
+[profile.release]
+strip = true
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 teloxide = { git = "https://github.com/teloxide/teloxide.git", features = ["macros", "throttle"] }
 log = "0.4"
 pretty_env_logger = "0.5"
-tokio = { version =  "1.46", features = ["full"] }
-reqwest = { version = "0.12", features = ["json"] }
+tokio = { version =  "1.49", features = ["full"] }
+reqwest = { version = "0.13", features = ["json"] }
 serde_json = "1.0"
-rusqlite = { version = "0.36", features = ["bundled"] }
+rusqlite = "0.38"
 image = "0.25"
-imageproc = "0.25"
+imageproc = "0.26"
 ab_glyph = "0.2"
 url-escape = "0.1"
-http = "1.3"
-http-cache-reqwest = { version = "0.16", features = ["manager-moka"] }
-reqwest-middleware = {version = "0.4", features = ["json"] }
+http = "1.4"
+http-cache-reqwest = { version = "1.0.0-alpha.4", features = ["manager-moka"] }
+reqwest-middleware = {version = "0.5", features = ["json"] }
 num-format = "0.4"
-bytes = "1.10"
+bytes = "1.11"
 serde = "1.0"
-serde_with = "3.13"
-timeago = "0.4"
-rand = "0.9"
+serde_with = "3.16"
+timeago = "0.6"
+rand = "0.10"
 async-trait = "0.1"
 task-local-extensions = "0.1"
 anyhow = "1.0"
 moka = { version = "0.12", features = ["future"] }
-strum = "0.27"
-strum_macros = "0.27"
+strum = "0.28"
+strum_macros = "0.28"
 chrono = "0.4"

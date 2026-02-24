@@ -1,5 +1,3 @@
-#![feature(iter_collect_into)]
-
 use std::{
     cmp::min,
     collections::{HashMap, HashSet},

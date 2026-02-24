@@ -3,9 +3,6 @@
 A telegram bot that supports last.fm, libre.fm and listenbrainz.org.
 https://t.me/lastfmrobot
 
-This project was compiled with rust nightly.
-It may use features that are not available in rust stable.
-
 ## Commands
 
 Below is a list of commands supported by this bot:

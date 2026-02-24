@@ -172,15 +172,12 @@ pub static CLIENT: LazyLock<ClientWithMiddleware> = LazyLock::new(|| {
         options: http_cache_reqwest::HttpCacheOptions {
             cache_options: CacheOptions {
                 shared: false,
-                cache_heuristic: 0.1, // 10% matches IE
                 immutable_min_time_to_live: Duration::from_secs(300),
                 ignore_cargo_cult: true,
+                ..Default::default()
             }
             .into(),
-            cache_key: None,
-            cache_mode_fn: None,
-            cache_bust: None,
-            cache_status_headers: true,
+            ..Default::default()
         },
     }))
     .build()

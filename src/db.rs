@@ -60,9 +60,9 @@ impl Db {
             .prepare("SELECT * FROM users WHERE tg_user_id = ?1 LIMIT 1")
             .unwrap();
 
-        stmt.query_map([tg_user_id], |row| {
+        stmt.query_map([tg_user_id as i64], |row| {
             Ok(User {
-                tg_user_id: row.get(0)?,
+                tg_user_id: row.get::<_, i64>(0)? as u64,
                 account_username: row.get(1)?,
                 api_type: row.get(2)?,
                 profile_shown: row.get(3)?,
@@ -76,11 +76,13 @@ impl Db {
 
     pub fn upsert_user(&self, user: &User) -> Result<usize> {
         self.conn.execute("INSERT INTO users (tg_user_id, account_username, api_type, profile_shown, cover_shown) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (tg_user_id) DO UPDATE SET account_username = ?2, api_type = ?3, profile_shown = ?4, cover_shown = ?5",
-         params![user.tg_user_id, user.account_username, user.api_type, user.profile_shown, user.cover_shown])
+         params![user.tg_user_id as i64, user.account_username, user.api_type, user.profile_shown, user.cover_shown])
     }
 
     pub fn delete_user(&self, tg_user_id: u64) -> Result<usize> {
-        self.conn
-            .execute("DELETE FROM users WHERE tg_user_id = ?1", [tg_user_id])
+        self.conn.execute(
+            "DELETE FROM users WHERE tg_user_id = ?1",
+            [tg_user_id as i64],
+        )
     }
 }
